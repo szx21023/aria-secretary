@@ -84,10 +84,15 @@ async def chat(payload: ChatRequest) -> StreamingResponse:
                     yield _sse(ev)
             except Exception as e:  # noqa: BLE001 — 串流中任何錯誤都回報前端 + 留 log，而非靜默
                 logger.exception("chat stream 失敗 (convo=%s)", convo.id)
-                # 已串給使用者看的部分回覆要存下來，避免 reload 後憑空消失
-                if streamed.strip() and not saved:
-                    _save_assistant(db, convo.id, streamed.strip())
-                    await db.commit()
+                # 已串給使用者看的部分回覆要存下來，避免 reload 後憑空消失。
+                # 復原存檔自己包 try：此時 DB 可能也在故障態，commit 再爆不能把 error frame 一起吞掉。
+                try:
+                    if streamed.strip() and not saved:
+                        _save_assistant(db, convo.id, streamed.strip())
+                        await db.commit()
+                except Exception:
+                    logger.exception("error 復原存檔也失敗 (convo=%s)", convo.id)
+                    await db.rollback()  # 對齊 get_db 慣例：別讓 session 帶著未結束交易離開
                 yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
 
     return StreamingResponse(

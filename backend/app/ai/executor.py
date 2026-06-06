@@ -100,6 +100,15 @@ async def find_free_slots_tool(
     window_start = datetime.combine(d, WORK_START, tzinfo=_TZ).astimezone(timezone.utc)
     window_end = datetime.combine(d, WORK_END, tzinfo=_TZ).astimezone(timezone.utc)
 
+    # 已經過去的時段不算空檔（避免在 15:00 還回報今天 09:00 有空）。
+    # 只要「現在」已晚於工作窗開始就往後縮（整個窗都過了則由下一行守衛攔下）；
+    # 查未來日期時 now 在窗前，不受影響。
+    now_utc = _now_local().astimezone(timezone.utc)
+    if window_start < now_utc:
+        window_start = now_utc
+    if window_start >= window_end:
+        return f"{d.isoformat()} 的工作時間（09:00–18:00）已經過了，沒有可安排的空檔。"
+
     slots = find_free_slots(events, window_start, window_end, min_minutes=min_minutes)
     if not slots:
         return f"{d.isoformat()} 在 09:00–18:00 之間沒有達 {min_minutes} 分鐘的空檔。"

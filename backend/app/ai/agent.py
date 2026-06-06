@@ -67,6 +67,8 @@ async def stream_chat(
         tool_results = []
         for block in final.content:
             if block.type == "tool_use":
+                # 成功路徑也留痕：日後 debug「為何回了奇怪的答案」才知道工具有沒有被呼叫、帶了什麼參數
+                logger.info("tool call: %s args=%s", block.name, block.input or {})
                 yield {"type": "tool", "name": block.name}
                 # 工具執行失敗（DB 錯誤、未預期例外）回成 is_error 的 tool_result，
                 # 讓模型知道失敗並自我修正，而不是讓整輪對話死在 broad except。
@@ -85,8 +87,10 @@ async def stream_chat(
         messages.append({"role": "user", "content": tool_results})
 
     text = full_text.strip()
+    if hit_cap:
+        # 用盡輪數一律記一筆：就算已有部分文字，也代表模型其實沒收尾，別讓它和正常回覆在 log 裡長一樣
+        logger.warning("tool round cap (%d) 用盡（text_len=%d）", MAX_TOOL_ROUNDS, len(text))
     if hit_cap and not text:
-        # 工具輪數用盡且沒生出任何文字 → 別吐空泡泡，給可重試的提示
-        logger.warning("tool round cap (%d) 用盡仍無最終回覆", MAX_TOOL_ROUNDS)
+        # 連一個字都沒生出來 → 別吐空泡泡，給可重試的提示
         text = "這次的查詢有點複雜，我沒能整理出完整回覆，可以換個方式再問一次嗎？"
     yield {"type": "done", "text": text}
