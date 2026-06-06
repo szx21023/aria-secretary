@@ -138,16 +138,18 @@ async def test_find_free_slots_bad_date(db):
 async def test_run_tool_routes_get_schedule(db, monkeypatch):
     _freeze(monkeypatch, _local(2026, 6, 5, 11))
     out = await run_tool(db, "get_schedule", {})
-    assert "行程" in out
+    assert "行程" in out.text
+    assert out.changed is None  # 唯讀工具不標改動
 
 
 async def test_run_tool_routes_find_free_slots(db, monkeypatch):
     _freeze(monkeypatch, _local(2026, 6, 5, 8))
     out = await run_tool(db, "find_free_slots", {"min_minutes": 30})
-    assert "空檔" in out or "沒有達" in out
+    assert "空檔" in out.text or "沒有達" in out.text
+    assert out.changed is None
 
 
 async def test_run_tool_unknown_name(db):
-    # 目前行為：未知工具回字串（非 is_error）。M4 會改成 raise，屆時更新此測試。
     out = await run_tool(db, "delete_everything", {})
-    assert out == "未知的工具：delete_everything"
+    assert out.text == "未知的工具：delete_everything"
+    assert out.changed is None

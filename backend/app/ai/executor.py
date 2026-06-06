@@ -1,8 +1,15 @@
-"""把 Claude 的 tool 呼叫對應到 DB 查詢，回傳給模型閱讀的文字結果。
+"""把 Claude 的 tool 呼叫對應到 DB 操作，回傳給模型閱讀的文字結果。
 
-M3 只有唯讀工具（get_schedule / find_free_slots）。寫入工具留待 M4。
+唯讀工具（get_schedule / find_free_slots）與寫入工具（create/reschedule/cancel
+event、add/complete task、create/toggle reminder）。寫入工具成功時在 ToolResult.changed
+標出改動的資源，讓 agent 推 state_changed 事件給前端即時刷新。
+衝突策略：偵測到時間衝突就回報、不執行；使用者確認後由 Claude 帶 allow_conflict=true 重呼叫。
+每個寫入工具各自 commit；整輪非原子是刻意取捨——衝突策略本就逐項確認，半套寫入（如加了待辦
+但會議因衝突沒排）傷害小，不值得為原子性把 commit 延到 turn 邊界、犧牲即時刷新。
 """
 
+import logging
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -10,14 +17,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.models.enums import EventCategory, ReminderKind, TaskPriority
 from app.models.event import Event
-from app.services.scheduling import find_free_slots
+from app.models.reminder import Reminder
+from app.models.task import Task
+from app.schemas.chat import ChangedResource
+from app.services.scheduling import detect_conflicts, find_free_slots
+
+logger = logging.getLogger(__name__)
 
 _TZ = ZoneInfo(get_settings().app_tz)
 
 # 找空檔的工作時間窗（在地時間）
 WORK_START = time(9, 0)
 WORK_END = time(18, 0)
+
+# 會改動資料的工具；用來判斷「呼叫了卻 changed=None」是真的 no-op（找不到/模糊/衝突/壞輸入）。
+_WRITE_TOOLS = frozenset({
+    "create_event", "reschedule_event", "cancel_event",
+    "add_task", "complete_task", "create_reminder", "toggle_reminder",
+})
 
 
 def _now_local() -> datetime:
@@ -82,7 +101,7 @@ async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "
         ppl = f"，{e.attendees} 人" if e.attendees else ""
         when = f"{e.start_at.astimezone(_TZ).strftime('%m/%d %H:%M')}–{_fmt(e.end_at)}"
         lines.append(
-            f"- {when} {e.title}（{e.category.value}，{_derive_status(e, now)}{loc}{ppl}）"
+            f"- {when} {e.title}（{e.category.value}，{_derive_status(e, now)}{loc}{ppl}）[id={e.id}]"
         )
     return "\n".join(lines)
 
@@ -117,10 +136,284 @@ async def find_free_slots_tool(
     return f"{d.isoformat()} 的空檔：" + "、".join(parts)
 
 
+async def get_tasks(db: AsyncSession) -> str:
+    rows = list(await db.scalars(select(Task).order_by(Task.done, Task.due_at.is_(None), Task.due_at)))
+    if not rows:
+        return "目前沒有任何待辦。"
+    undone = sum(1 for t in rows if not t.done)
+    lines = [f"待辦共 {len(rows)} 項（未完成 {undone}、已完成 {len(rows) - undone}）："]
+    for t in rows:
+        status = "已完成" if t.done else "未完成"
+        prio = f"，{t.priority.value}" if t.priority else ""
+        due = f"，到期 {_fmt_dt(t.due_at)}" if t.due_at else ""
+        lines.append(f"- {t.title}（{status}{prio}{due}）")
+    return "\n".join(lines)
+
+
+async def get_reminders(db: AsyncSession) -> str:
+    rows = list(
+        await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at))
+    )
+    if not rows:
+        return "目前沒有任何提醒。"
+    lines = [f"提醒共 {len(rows)} 則："]
+    for r in rows:
+        state = "啟用中" if r.enabled else "已關閉"
+        sub = f"，{r.subtitle}" if r.subtitle else ""
+        when = f"，{_fmt_dt(r.trigger_at)}" if r.trigger_at else ""
+        lines.append(f"- {r.title}（{state}，{r.kind.value}{sub}{when}）")
+    return "\n".join(lines)
+
+
+# ── 寫入工具 ────────────────────────────────────────────────────
+
+
+@dataclass
+class ToolResult:
+    """工具執行結果。changed 標出被改動的資源（events/tasks/reminders），
+
+    None 代表唯讀或未實際改動（例如偵測到衝突而暫不執行）——agent 只在 changed
+    非 None 時推 state_changed，避免空操作觸發前端重抓。
+    """
+
+    text: str
+    changed: ChangedResource | None = None
+
+
+def _parse_dt(s: str) -> datetime:
+    """ISO 字串 → UTC aware datetime；無時區資訊者視為在地時間。"""
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_TZ)
+    return dt.astimezone(timezone.utc)
+
+
+def _fmt_dt(dt: datetime) -> str:
+    return dt.astimezone(_TZ).strftime("%m/%d %H:%M")
+
+
+def _conflict_msg(conflicts: list[Event]) -> str:
+    items = "、".join(f"{_fmt(c.start_at)}–{_fmt(c.end_at)} {c.title}" for c in conflicts)
+    return f"時間衝突：與 {items} 重疊。"
+
+
+async def _overlapping_events(
+    db: AsyncSession, start: datetime, end: datetime, exclude_id: str | None = None
+) -> list[Event]:
+    # 半開區間重疊：start_at < end 且 end_at > start（相接不算）
+    stmt = select(Event).where(Event.start_at < end, Event.end_at > start)
+    if exclude_id is not None:
+        stmt = stmt.where(Event.id != exclude_id)
+    return list(await db.scalars(stmt))
+
+
+async def create_event(
+    db: AsyncSession,
+    title: str,
+    start_at: str,
+    duration_min: int,
+    category: str | None = None,
+    location: str | None = None,
+    attendees: int | None = None,
+    allow_conflict: bool = False,
+) -> ToolResult:
+    try:
+        start = _parse_dt(start_at)
+    except ValueError:
+        return ToolResult(f"開始時間無法解析：{start_at!r}，請用 ISO 格式如 2026-06-07T15:00。")
+    if not duration_min or duration_min <= 0:
+        return ToolResult("duration_min 必須是正整數（分鐘）。")
+    try:
+        cat = EventCategory(category) if category else EventCategory.meeting
+    except ValueError:
+        return ToolResult(f"未知的分類：{category!r}，可用：meeting/focus/meal/personal。")
+    end = start + timedelta(minutes=duration_min)
+
+    if not allow_conflict:
+        conflicts = detect_conflicts(await _overlapping_events(db, start, end), start, end)
+        if conflicts:
+            return ToolResult(
+                _conflict_msg(conflicts)
+                + " 已暫不建立；若使用者確認仍要安排，帶 allow_conflict=true 再呼叫。"
+            )
+
+    db.add(Event(title=title, start_at=start, end_at=end, category=cat,
+                 location=location, attendees=attendees))
+    await db.commit()
+    return ToolResult(f"已新增行程：{_fmt_dt(start)}–{_fmt(end)} {title}。", changed="events")
+
+
+async def reschedule_event(
+    db: AsyncSession,
+    event_id: str,
+    new_start_at: str | None = None,
+    delta_min: int | None = None,
+    allow_conflict: bool = False,
+) -> ToolResult:
+    event = await db.get(Event, event_id)
+    if event is None:
+        return ToolResult(f"找不到 id={event_id} 的行程，請先用 get_schedule 確認。")
+    duration = event.end_at - event.start_at
+    if new_start_at:
+        try:
+            new_start = _parse_dt(new_start_at)
+        except ValueError:
+            return ToolResult(f"新開始時間無法解析：{new_start_at!r}，請用 ISO 格式。")
+    elif delta_min is not None:
+        new_start = event.start_at + timedelta(minutes=delta_min)
+    else:
+        return ToolResult("請提供 new_start_at（絕對時間）或 delta_min（相對分鐘）其中一個。")
+    new_end = new_start + duration
+
+    if not allow_conflict:
+        conflicts = detect_conflicts(
+            await _overlapping_events(db, new_start, new_end, event.id),
+            new_start, new_end, exclude_id=event.id,
+        )
+        if conflicts:
+            return ToolResult(
+                _conflict_msg(conflicts)
+                + " 已暫不改期；若使用者確認仍要改，帶 allow_conflict=true 再呼叫。"
+            )
+
+    event.start_at = new_start
+    event.end_at = new_end
+    await db.commit()
+    return ToolResult(
+        f"已改期：{event.title} → {_fmt_dt(new_start)}–{_fmt(new_end)}。", changed="events"
+    )
+
+
+async def cancel_event(db: AsyncSession, event_id: str) -> ToolResult:
+    event = await db.get(Event, event_id)
+    if event is None:
+        return ToolResult(f"找不到 id={event_id} 的行程。")
+    label = f"{_fmt_dt(event.start_at)} {event.title}"
+    await db.delete(event)
+    await db.commit()
+    return ToolResult(f"已取消：{label}。", changed="events")
+
+
+async def add_task(
+    db: AsyncSession, title: str, due_at: str | None = None, priority: str | None = None
+) -> ToolResult:
+    due = None
+    if due_at:
+        try:
+            due = _parse_dt(due_at)
+        except ValueError:
+            return ToolResult(f"到期時間無法解析：{due_at!r}，請用 ISO 格式或省略。")
+    prio = None
+    if priority:
+        try:
+            prio = TaskPriority(priority)
+        except ValueError:
+            return ToolResult(f"未知的優先級：{priority!r}，可用：high/medium/low。")
+    db.add(Task(title=title, due_at=due, priority=prio))
+    await db.commit()
+    return ToolResult(f"已加入待辦：{title}。", changed="tasks")
+
+
+async def complete_task(db: AsyncSession, query: str) -> ToolResult:
+    rows = list(await db.scalars(select(Task)))
+    # 先精確比對整個標題，唯一才退回子字串：避免短關鍵字偶然命中而默默改錯目標。
+    # 模糊度看「全部符合數」而非只看未完成——一完成一未完成時也回報請確認，不擅自挑未完成那筆。
+    matches = [t for t in rows if t.title == query] or [t for t in rows if query in t.title]
+    if not matches:
+        return ToolResult(f"找不到符合「{query}」的待辦。")
+    if len(matches) > 1:
+        names = "、".join(t.title for t in matches)
+        return ToolResult(f"有多個符合「{query}」的待辦：{names}。請確認是哪一個。")
+    task = matches[0]
+    if task.done:
+        return ToolResult(f"「{task.title}」已經是完成狀態了。")
+    task.done = True
+    await db.commit()
+    return ToolResult(f"已完成待辦：{task.title}。", changed="tasks")
+
+
+async def create_reminder(
+    db: AsyncSession,
+    title: str,
+    subtitle: str | None = None,
+    trigger_at: str | None = None,
+    kind: str | None = None,
+    recurrence: str | None = None,
+) -> ToolResult:
+    trig = None
+    if trigger_at:
+        try:
+            trig = _parse_dt(trigger_at)
+        except ValueError:
+            return ToolResult(f"提醒時間無法解析：{trigger_at!r}，請用 ISO 格式或省略。")
+    try:
+        k = ReminderKind(kind) if kind else ReminderKind.meeting
+    except ValueError:
+        return ToolResult(f"未知的提醒類型：{kind!r}，可用：meeting/birthday/bill/health。")
+    db.add(Reminder(title=title, subtitle=subtitle, trigger_at=trig, kind=k, recurrence=recurrence))
+    await db.commit()
+    suffix = f"（{recurrence}）" if recurrence else ""
+    return ToolResult(f"已新增提醒：{title}{suffix}。", changed="reminders")
+
+
+async def toggle_reminder(db: AsyncSession, query: str, enabled: bool) -> ToolResult:
+    rows = list(await db.scalars(select(Reminder)))
+    # 同 complete_task：精確標題優先，唯一才退子字串——關掉錯的提醒（漏掉帳單/健康通知）後果靜默。
+    matches = [r for r in rows if r.title == query] or [r for r in rows if query in r.title]
+    if not matches:
+        return ToolResult(f"找不到符合「{query}」的提醒。")
+    if len(matches) > 1:
+        names = "、".join(r.title for r in matches)
+        return ToolResult(f"有多個符合「{query}」的提醒：{names}。請確認是哪一個。")
+    matches[0].enabled = enabled
+    await db.commit()
+    state = "開啟" if enabled else "關閉"
+    return ToolResult(f"已{state}提醒：{matches[0].title}。", changed="reminders")
+
+
+async def run_tool(db: AsyncSession, name: str, args: dict) -> ToolResult:
+    result = await _dispatch(db, name, args)
+    # 寫入工具被呼叫卻沒改到資料（找不到/模糊/衝突/壞輸入），留一筆 log。
+    # 否則「模型把 no-op 講成已完成」在 server 端只看得到工具被呼叫、看不出它其實沒做成。
+    if name in _WRITE_TOOLS and result.changed is None:
+        logger.info("tool %s no-op: %s", name, result.text)
+    return result
+
+
 # tool name → 執行函式
-async def run_tool(db: AsyncSession, name: str, args: dict) -> str:
+async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
     if name == "get_schedule":
-        return await get_schedule(db, args.get("date"), args.get("range", "day"))
+        return ToolResult(await get_schedule(db, args.get("date"), args.get("range", "day")))
     if name == "find_free_slots":
-        return await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30))
-    return f"未知的工具：{name}"
+        return ToolResult(
+            await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30))
+        )
+    if name == "get_tasks":
+        return ToolResult(await get_tasks(db))
+    if name == "get_reminders":
+        return ToolResult(await get_reminders(db))
+    if name == "create_event":
+        return await create_event(
+            db, args["title"], args["start_at"], args["duration_min"],
+            args.get("category"), args.get("location"), args.get("attendees"),
+            args.get("allow_conflict", False),
+        )
+    if name == "reschedule_event":
+        return await reschedule_event(
+            db, args["event_id"], args.get("new_start_at"), args.get("delta_min"),
+            args.get("allow_conflict", False),
+        )
+    if name == "cancel_event":
+        return await cancel_event(db, args["event_id"])
+    if name == "add_task":
+        return await add_task(db, args["title"], args.get("due_at"), args.get("priority"))
+    if name == "complete_task":
+        return await complete_task(db, args["query"])
+    if name == "create_reminder":
+        return await create_reminder(
+            db, args["title"], args.get("subtitle"), args.get("trigger_at"),
+            args.get("kind"), args.get("recurrence"),
+        )
+    if name == "toggle_reminder":
+        return await toggle_reminder(db, args["query"], args["enabled"])
+    return ToolResult(f"未知的工具：{name}")
