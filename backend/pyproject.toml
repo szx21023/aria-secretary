@@ -10,7 +10,7 @@ dependencies = [
     "aiosqlite>=0.20",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
-    "anthropic>=0.40",
+    "anthropic>=0.69",
     "python-dotenv>=1.0",
 ]
 

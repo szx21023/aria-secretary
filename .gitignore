@@ -14,3 +14,4 @@ frontend/.playwright-mcp/
 
 # misc
 .DS_Store
+.playwright-mcp/

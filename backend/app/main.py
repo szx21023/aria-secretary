@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -5,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api import events, reminders, tasks
+from app.api import chat, events, reminders, tasks
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
 from app.seed import seed_if_empty
@@ -13,8 +14,25 @@ from app.seed import seed_if_empty
 settings = get_settings()
 
 
+def _setup_logging() -> None:
+    """讓 app.* 的 INFO 日誌（工具呼叫、stream 警告）真的輸出。
+
+    uvicorn 預設只配置自己的 logger，app logger 會落到 root 的 lastResort handler（WARNING 起跳），
+    INFO 會被丟掉。這裡只把 "app" 命名空間獨立拉到 INFO，不動 root，避免 httpx/sqlalchemy 一起變吵。
+    在 lifespan 啟動時呼叫（而非 import 時），才不會在被 import 的測試行程裡偷改全域 logging 狀態。
+    """
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(logging.INFO)
+    app_logger.propagate = False  # 設在 handler 判斷外，狀態才不依賴 import 次序
+    if not app_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        app_logger.addHandler(handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _setup_logging()
     await init_db()
     async with AsyncSessionLocal() as db:
         await seed_if_empty(db)
@@ -34,6 +52,7 @@ app.add_middleware(
 app.include_router(events.router)
 app.include_router(tasks.router)
 app.include_router(reminders.router)
+app.include_router(chat.router)
 
 
 @app.exception_handler(IntegrityError)

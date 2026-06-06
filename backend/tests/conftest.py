@@ -41,3 +41,19 @@ async def client():
 
     app.dependency_overrides.clear()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db():
+    """裸的 AsyncSession（不經 ASGI），給直接測 service / executor 用。"""
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with session_maker() as session:
+        yield session
+    await engine.dispose()
