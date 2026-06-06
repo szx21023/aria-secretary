@@ -9,6 +9,8 @@ backend/.env
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+frontend/*.tsbuildinfo
+frontend/.playwright-mcp/
 
 # misc
 .DS_Store
