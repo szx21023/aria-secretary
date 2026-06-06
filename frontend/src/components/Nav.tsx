@@ -1,8 +1,8 @@
-import { Icon } from "../lib/icons";
+import { Icon, type IconName } from "../lib/icons";
 
 export type ViewId = "today" | "calendar" | "tasks" | "reminders";
 
-const NAV: { id: ViewId; icon: string; label: string }[] = [
+const NAV: { id: ViewId; icon: IconName; label: string }[] = [
   { id: "today", icon: "home", label: "今日" },
   { id: "calendar", icon: "calendar", label: "行事曆" },
   { id: "tasks", icon: "check", label: "任務" },

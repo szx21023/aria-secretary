@@ -33,8 +33,7 @@ export function CalendarView({ events, onOpenEvent }: Props) {
   const nowTop = ((now.getHours() * 60 + now.getMinutes()) - H0 * 60) / 60 * PXH;
   const todayCol = weekdayMon1(now); // 1..7
 
-  const weekEnd = new Date(days[6]);
-  weekEnd.setDate(weekEnd.getDate() + 1);
+  // 近似週數＝今年第幾個 7 天區塊（從 1/1 起算，非 ISO 週，跨年邊界可能差 1）
   const weekNo = Math.ceil(
     ((+weekStart - +new Date(weekStart.getFullYear(), 0, 1)) / 86400000 + 1) / 7,
   );

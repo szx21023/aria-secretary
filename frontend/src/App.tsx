@@ -11,6 +11,7 @@ import {
   useToggleReminder,
   useToggleTask,
 } from "./hooks/useData";
+import { isToday } from "./lib/format";
 import type { Event } from "./lib/types";
 import { CalendarView } from "./views/CalendarView";
 import { RemindersView } from "./views/RemindersView";
@@ -75,7 +76,7 @@ export default function App() {
               <TasksView
                 tasks={taskList}
                 onToggleTask={(t) => toggleTask.mutate(t)}
-                onAddTask={(title) => addTask.mutate(title)}
+                onAddTask={(title) => addTask.mutateAsync(title)}
               />
             )}
             {view === "reminders" && (
@@ -99,7 +100,7 @@ export default function App() {
         </div>
         <div className="s-thread">
           <div className="s-bub a">
-            早安 ☀️ 今天有 {evList.filter((e) => new Date(e.start_at).toDateString() === new Date().toDateString()).length} 個行程、
+            早安 ☀️ 今天有 {evList.filter((e) => isToday(e.start_at)).length} 個行程、
             {taskList.filter((t) => !t.done).length} 項待辦。需要我幫你安排什麼嗎？
           </div>
           <div className="s-bub a">對話功能將於 M3 接上真 Claude API。</div>

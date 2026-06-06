@@ -7,7 +7,7 @@ import type { Task } from "../lib/types";
 interface Props {
   tasks: Task[];
   onToggleTask: (t: Task) => void;
-  onAddTask: (title: string) => void;
+  onAddTask: (title: string) => Promise<unknown>;
 }
 
 function TaskRow({ task, onToggle }: { task: Task; onToggle: (t: Task) => void }) {
@@ -31,11 +31,15 @@ export function TasksView({ tasks, onToggleTask, onAddTask }: Props) {
   const undone = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
 
-  const add = () => {
+  const add = async () => {
     const v = val.trim();
     if (!v) return;
-    onAddTask(v);
-    setVal("");
+    try {
+      await onAddTask(v);
+      setVal(""); // 成功才清空，失敗則保留輸入（完整錯誤提示留待 M5）
+    } catch {
+      /* 保留輸入，待 M5 加上全域錯誤提示 */
+    }
   };
 
   return (
