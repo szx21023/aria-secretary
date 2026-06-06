@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.models.event import Event
 from app.schemas.event import EventCreate, EventRead, EventUpdate
+from app.services.scheduling import INTERVAL_ERROR, interval_ok
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -52,10 +53,25 @@ async def update_event(
     event_id: str, payload: EventUpdate, db: AsyncSession = Depends(get_db)
 ) -> Event:
     event = await _get_or_404(db, event_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+
+    # 跨欄位規則必須在「合併進現有行程後」才驗證得了：部分更新可能只送了
+    # start_at 或 end_at 其中一個，得跟資料庫裡的另一半比對。同時擋掉顯式 null
+    # （兩者皆為 NOT NULL 欄位），否則會在比較或 commit 時炸成 500。
+    new_start = changes.get("start_at", event.start_at)
+    new_end = changes.get("end_at", event.end_at)
+    if new_start is None or new_end is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="start_at / end_at 不可為 null",
+        )
+    if not interval_ok(new_start, new_end):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=INTERVAL_ERROR
+        )
+
+    for field, value in changes.items():
         setattr(event, field, value)
-    if event.end_at <= event.start_at:
-        raise HTTPException(status_code=422, detail="end_at 必須晚於 start_at")
     await db.commit()
     await db.refresh(event)
     return event

@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import ReminderKind
+from app.schemas.types import UTCDatetime
 
 
 class ReminderRead(BaseModel):
@@ -20,7 +21,7 @@ class ReminderRead(BaseModel):
 class ReminderCreate(BaseModel):
     title: str
     subtitle: str | None = None
-    trigger_at: datetime | None = None
+    trigger_at: UTCDatetime | None = None
     recurrence: str | None = None
     kind: ReminderKind = ReminderKind.meeting
     enabled: bool = True
@@ -31,7 +32,7 @@ class ReminderUpdate(BaseModel):
 
     title: str | None = None
     subtitle: str | None = None
-    trigger_at: datetime | None = None
+    trigger_at: UTCDatetime | None = None
     recurrence: str | None = None
     kind: ReminderKind | None = None
     enabled: bool | None = None

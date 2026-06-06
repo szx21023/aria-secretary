@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from app.services.scheduling import detect_conflicts, find_free_slots
+import pytest
+
+from app.services.scheduling import FreeSlot, detect_conflicts, find_free_slots
 
 UTC = timezone.utc
 
@@ -61,3 +63,47 @@ def test_find_free_slots_merges_overlapping_events():
     slots = find_free_slots(events, window_start, window_end, min_minutes=30)
     spans = [(s.start.hour, s.end.hour) for s in slots]
     assert spans == [(9, 10), (13, 15)]
+
+
+def test_detect_conflicts_returns_sorted_list():
+    # 故意亂序傳入，確認回傳依 start_at 排序（鎖住 docstring 承諾的契約）
+    events = [_ev("late", 14, 15), _ev("early", 9, 10), _ev("mid", 11, 12)]
+    hits = detect_conflicts(events, _ev("x", 9, 16).start_at, _ev("x", 9, 16).end_at)
+    assert [e.id for e in hits] == ["early", "mid", "late"]
+
+
+def test_detect_conflicts_rejects_inverted_interval():
+    with pytest.raises(ValueError):
+        detect_conflicts([], _ev("x", 11, 10).start_at, _ev("x", 11, 10).end_at)
+
+
+def test_find_free_slots_empty_window_returns_empty():
+    day = datetime(2026, 6, 5, tzinfo=UTC)
+    t = day + timedelta(hours=9)
+    assert find_free_slots([], t, t) == []  # 零寬視窗
+
+
+def test_find_free_slots_inverted_window_raises():
+    day = datetime(2026, 6, 5, tzinfo=UTC)
+    with pytest.raises(ValueError):
+        find_free_slots([], day + timedelta(hours=12), day + timedelta(hours=9))
+
+
+def test_find_free_slots_no_events_is_whole_window():
+    day = datetime(2026, 6, 5, tzinfo=UTC)
+    ws, we = day + timedelta(hours=9), day + timedelta(hours=18)
+    slots = find_free_slots([], ws, we, min_minutes=30)
+    assert len(slots) == 1
+    assert slots[0].start == ws and slots[0].end == we
+
+
+def test_free_slot_minutes():
+    day = datetime(2026, 6, 5, tzinfo=UTC)
+    slot = FreeSlot(day + timedelta(hours=9), day + timedelta(hours=10, minutes=30))
+    assert slot.minutes == 90
+
+
+def test_free_slot_rejects_invalid():
+    day = datetime(2026, 6, 5, tzinfo=UTC)
+    with pytest.raises(ValueError):
+        FreeSlot(day + timedelta(hours=10), day + timedelta(hours=9))

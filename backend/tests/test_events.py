@@ -82,3 +82,39 @@ async def test_list_filter_by_range(client: AsyncClient):
     assert r.status_code == 200
     titles = [e["title"] for e in r.json()]
     assert titles == ["今天"]
+
+
+async def test_create_rejects_end_equals_start(client: AsyncClient):
+    # 邊界：end == start 應被拒（驗證用 <=，不是 <）
+    r = await client.post("/api/events", json=_payload(end_at="2026-06-05T02:30:00Z"))
+    assert r.status_code == 422
+
+
+async def test_patch_null_datetime_rejected(client: AsyncClient):
+    # 回歸測試：顯式送 null 以前會炸成 500
+    created = (await client.post("/api/events", json=_payload())).json()
+    r = await client.patch(f"/api/events/{created['id']}", json={"start_at": None})
+    assert r.status_code == 422
+
+
+async def test_patch_naive_datetime_coerced(client: AsyncClient):
+    # 回歸測試：naive datetime 以前會在比較時炸成 500；現在當成 UTC
+    created = (await client.post("/api/events", json=_payload())).json()
+    r = await client.patch(f"/api/events/{created['id']}", json={"end_at": "2026-06-05T05:00:00"})
+    assert r.status_code == 200
+    assert r.json()["end_at"] == "2026-06-05T05:00:00Z"
+
+
+async def test_patch_start_moved_past_end(client: AsyncClient):
+    # 只改 start_at 到現有 end_at 之後 → 必須 422（跨欄位、合併後才驗得出）
+    created = (await client.post("/api/events", json=_payload())).json()
+    r = await client.patch(f"/api/events/{created['id']}", json={"start_at": "2026-06-05T04:00:00Z"})
+    assert r.status_code == 422
+
+
+async def test_patch_missing_404(client: AsyncClient):
+    assert (await client.patch("/api/events/nope", json={"title": "x"})).status_code == 404
+
+
+async def test_delete_missing_404(client: AsyncClient):
+    assert (await client.delete("/api/events/nope")).status_code == 404
