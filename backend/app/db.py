@@ -12,9 +12,17 @@ AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_co
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency：每個 request 一個 session。"""
+    """FastAPI dependency：每個 request 一個 session。
+
+    端點裡的例外（含 commit 失敗）往上拋時，明確 rollback 再 re-raise，
+    避免 session 帶著未結束的交易回到連線池。
+    """
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def init_db() -> None:
