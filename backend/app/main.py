@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api import events, reminders, tasks
+from app.api import chat, events, reminders, tasks
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
 from app.seed import seed_if_empty
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(events.router)
 app.include_router(tasks.router)
 app.include_router(reminders.router)
+app.include_router(chat.router)
 
 
 @app.exception_handler(IntegrityError)

@@ -1,17 +1,16 @@
 import { useState } from "react";
 
+import { AIRail } from "./components/AIRail";
 import { EventDetail } from "./components/EventDetail";
 import { Nav, type ViewId } from "./components/Nav";
 import {
   useAddTask,
   useEvents,
-  useHealth,
   useReminders,
   useTasks,
   useToggleReminder,
   useToggleTask,
 } from "./hooks/useData";
-import { isToday } from "./lib/format";
 import type { Event } from "./lib/types";
 import { CalendarView } from "./views/CalendarView";
 import { RemindersView } from "./views/RemindersView";
@@ -22,7 +21,6 @@ export default function App() {
   const [view, setView] = useState<ViewId>("today");
   const [detail, setDetail] = useState<Event | null>(null);
 
-  const health = useHealth();
   const events = useEvents();
   const tasks = useTasks();
   const reminders = useReminders();
@@ -89,28 +87,7 @@ export default function App() {
         )}
       </main>
 
-      {/* M3 會用真正的 AIRail 對話側欄取代此佔位 */}
-      <aside className="s-rail">
-        <div className="s-rail-h">
-          <div className="s-orb" />
-          <b>秘書 Aria</b>
-          <small>
-            {health.isLoading ? "連線中…" : health.isError ? "後端未連線" : "隨時為你安排"}
-          </small>
-        </div>
-        <div className="s-thread">
-          <div className="s-bub a">
-            早安 ☀️ 今天有 {evList.filter((e) => isToday(e.start_at)).length} 個行程、
-            {taskList.filter((t) => !t.done).length} 項待辦。需要我幫你安排什麼嗎？
-          </div>
-          <div className="s-bub a">對話功能將於 M3 接上真 Claude API。</div>
-        </div>
-        <div className="s-inputbar" style={{ opacity: 0.5 }}>
-          <span className="s-mic" />
-          <input placeholder="（M3 啟用）輸入或說出你的需求…" disabled />
-          <div className="s-send" />
-        </div>
-      </aside>
+      <AIRail />
 
       {detail && <EventDetail ev={detail} onClose={() => setDetail(null)} />}
     </div>
