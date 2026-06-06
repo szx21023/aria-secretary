@@ -73,9 +73,20 @@ async def stream_chat(
                 # 工具執行失敗（DB 錯誤、未預期例外）回成 is_error 的 tool_result，
                 # 讓模型知道失敗並自我修正，而不是讓整輪對話死在 broad except。
                 try:
-                    content = await run_tool(db, block.name, block.input or {})
-                    tr = {"type": "tool_result", "tool_use_id": block.id, "content": content}
+                    result = await run_tool(db, block.name, block.input or {})
+                    tr = {"type": "tool_result", "tool_use_id": block.id, "content": result.text}
+                    # 工具真的改了資料才推 state_changed，讓前端只重抓受影響的 query
+                    if result.changed:
+                        yield {"type": "state_changed", "resource": result.changed}
                 except Exception as e:
+                    # 工具若 commit 到一半失敗，整段串流共用的 session 會進 pending-rollback；
+                    # 先 rollback 讓它對同輪後續工具與最後存 assistant 訊息仍可用，
+                    # 否則單一暫時性錯誤會 cascade 成一連串 PendingRollbackError、整輪回覆遺失。
+                    # rollback 自己也包起來：連 rollback 都爆也不能讓例外逸出 stream、吞掉 error frame 與原始錯誤。
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        logger.exception("tool %s 失敗後 rollback 也失敗", block.name)
                     logger.exception("tool %s 執行失敗", block.name)
                     tr = {
                         "type": "tool_result",

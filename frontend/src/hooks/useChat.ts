@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -19,10 +20,12 @@ interface HistoryRow {
 type ChatEvent =
   | { type: "delta"; text: string }
   | { type: "tool"; name: string }
+  | { type: "state_changed"; resource: string }
   | { type: "done"; text: string }
   | { type: "error"; message: string };
 
 export function useChat() {
+  const qc = useQueryClient();
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [thinking, setThinking] = useState(false);
 
@@ -95,7 +98,10 @@ export function useChat() {
               continue;
             }
             if (ev.type === "delta") appendAssistant(ev.text);
-            else if (ev.type === "error") {
+            else if (ev.type === "state_changed") {
+              // 秘書改了資料 → 重抓對應 query，畫面即時反映
+              qc.invalidateQueries({ queryKey: [ev.resource] });
+            } else if (ev.type === "error") {
               console.error("對話錯誤：", ev.message);
               fail(RETRY_MSG);
             }
@@ -109,7 +115,7 @@ export function useChat() {
         setThinking(false);
       }
     },
-    [thinking],
+    [thinking, qc],
   );
 
   return { messages, thinking, send };

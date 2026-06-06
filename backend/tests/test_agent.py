@@ -13,6 +13,7 @@ import pytest
 
 from app.ai import agent
 from app.ai.agent import MAX_TOOL_ROUNDS, stream_chat
+from app.ai.executor import ToolResult
 
 pytestmark = pytest.mark.asyncio
 
@@ -87,8 +88,15 @@ def _final(stop_reason: str, content: list) -> SimpleNamespace:
     return SimpleNamespace(stop_reason=stop_reason, content=content)
 
 
+class _FakeDB:
+    """agent 測試不碰真 DB（run_tool 都被 monkeypatch），只需支援失敗路徑的 rollback。"""
+
+    async def rollback(self):
+        pass
+
+
 async def _collect(history=None, user_text="嗨"):
-    return [ev async for ev in stream_chat(None, history or [], user_text)]
+    return [ev async for ev in stream_chat(_FakeDB(), history or [], user_text)]
 
 
 # ── 測試 ────────────────────────────────────────────────────────
@@ -117,7 +125,7 @@ async def test_single_tool_round_reinjects_result(monkeypatch):
     async def fake_run_tool(db, name, args):
         called["name"] = name
         called["args"] = args
-        return "SCHEDULE_RESULT"
+        return ToolResult("SCHEDULE_RESULT")
 
     monkeypatch.setattr(agent, "run_tool", fake_run_tool)
 
@@ -177,7 +185,7 @@ async def test_thinking_block_reinjected_verbatim(monkeypatch):
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def ok(db, name, args):
-        return "R"
+        return ToolResult("R")
 
     monkeypatch.setattr(agent, "run_tool", ok)
 
@@ -186,6 +194,66 @@ async def test_thinking_block_reinjected_verbatim(monkeypatch):
     reinjected = fake.sent_messages[1][-2]
     assert reinjected["role"] == "assistant"
     assert think in reinjected["content"]  # 同一個 thinking 物件原樣帶回，簽章未被動過
+
+
+async def test_write_tool_emits_state_changed(monkeypatch):
+    # 寫入工具回傳 changed 時，agent 要在 tool 與 done 之間推 state_changed，前端才會重抓
+    fake = _FakeClient([
+        ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
+        (["好，加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
+    ])
+    monkeypatch.setattr(agent, "get_client", lambda: fake)
+
+    async def fake_run_tool(db, name, args):
+        return ToolResult("已加入待辦：回信。", changed="tasks")
+
+    monkeypatch.setattr(agent, "run_tool", fake_run_tool)
+
+    events = await _collect()
+    sc = [e for e in events if e["type"] == "state_changed"]
+    assert sc == [{"type": "state_changed", "resource": "tasks"}]
+    # 順序：tool 在前、state_changed 隨後、done 最後
+    types = [e["type"] for e in events]
+    assert types.index("tool") < types.index("state_changed") < types.index("done")
+
+
+async def test_readonly_tool_emits_no_state_changed(monkeypatch):
+    fake = _FakeClient([
+        ([], _final("tool_use", [_tool_block("get_schedule", "t1", {})])),
+        (["今天兩個行程"], _final("end_turn", [_text_block("今天兩個行程")])),
+    ])
+    monkeypatch.setattr(agent, "get_client", lambda: fake)
+
+    async def fake_run_tool(db, name, args):
+        return ToolResult("今天有 2 個行程。")  # changed=None
+
+    monkeypatch.setattr(agent, "run_tool", fake_run_tool)
+
+    events = await _collect()
+    assert not [e for e in events if e["type"] == "state_changed"]
+
+
+async def test_parallel_writers_emit_state_changed_per_resource(monkeypatch):
+    # 一輪多個寫入工具 → 每個改動各發一個 state_changed，resource 對、順序對
+    fake = _FakeClient([
+        ([], _final("tool_use", [
+            _tool_block("add_task", "t1", {"title": "A"}),
+            _tool_block("create_event", "t2", {"title": "B", "start_at": "2026-06-07T15:00", "duration_min": 30}),
+        ])),
+        (["都處理好了"], _final("end_turn", [_text_block("都處理好了")])),
+    ])
+    monkeypatch.setattr(agent, "get_client", lambda: fake)
+
+    resource_of = {"add_task": "tasks", "create_event": "events"}
+
+    async def rt(db, name, args):
+        return ToolResult(f"done {name}", changed=resource_of[name])
+
+    monkeypatch.setattr(agent, "run_tool", rt)
+
+    events = await _collect()
+    sc = [e["resource"] for e in events if e["type"] == "state_changed"]
+    assert sc == ["tasks", "events"]
 
 
 async def test_multiple_tool_calls_in_one_round(monkeypatch):
@@ -203,7 +271,7 @@ async def test_multiple_tool_calls_in_one_round(monkeypatch):
 
     async def rec(db, name, args):
         calls.append(name)
-        return f"R-{name}"
+        return ToolResult(f"R-{name}")
 
     monkeypatch.setattr(agent, "run_tool", rec)
 
@@ -228,7 +296,7 @@ async def test_round_cap_returns_retry_message(monkeypatch):
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def ok(db, name, args):
-        return "ok"
+        return ToolResult("ok")
 
     monkeypatch.setattr(agent, "run_tool", ok)
 
