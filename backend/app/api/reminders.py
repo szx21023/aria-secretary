@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.helpers import reject_null_fields
 from app.db import get_db
 from app.models.reminder import Reminder
 from app.schemas.reminder import ReminderCreate, ReminderRead, ReminderUpdate
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
+
+# Reminder 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
+_REQUIRED_FIELDS = frozenset({"title", "kind", "enabled"})
 
 
 async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
@@ -45,7 +49,9 @@ async def update_reminder(
     reminder_id: str, payload: ReminderUpdate, db: AsyncSession = Depends(get_db)
 ) -> Reminder:
     reminder = await _get_or_404(db, reminder_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    reject_null_fields(changes, _REQUIRED_FIELDS)
+    for field, value in changes.items():
         setattr(reminder, field, value)
     await db.commit()
     await db.refresh(reminder)

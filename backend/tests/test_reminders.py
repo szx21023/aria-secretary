@@ -26,3 +26,18 @@ async def test_missing_404(client: AsyncClient):
     assert (await client.get("/api/reminders/nope")).status_code == 404
     assert (await client.patch("/api/reminders/nope", json={"enabled": False})).status_code == 404
     assert (await client.delete("/api/reminders/nope")).status_code == 404
+
+
+async def test_patch_null_required_field_is_422(client: AsyncClient):
+    created = (await client.post("/api/reminders", json={"title": "x", "kind": "health"})).json()
+    assert (await client.patch(f"/api/reminders/{created['id']}", json={"enabled": None})).status_code == 422
+    assert (await client.patch(f"/api/reminders/{created['id']}", json={"kind": None})).status_code == 422
+
+
+async def test_naive_trigger_at_coerced_to_utc(client: AsyncClient):
+    r = await client.post(
+        "/api/reminders",
+        json={"title": "提前提醒", "kind": "meeting", "trigger_at": "2026-06-05T06:00:00"},
+    )
+    assert r.status_code == 201
+    assert r.json()["trigger_at"] == "2026-06-05T06:00:00Z"

@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.helpers import reject_null_fields
 from app.db import get_db
 from app.models.task import Task
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+
+# Task 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
+_REQUIRED_FIELDS = frozenset({"title", "done"})
 
 
 async def _get_or_404(db: AsyncSession, task_id: str) -> Task:
@@ -43,7 +47,9 @@ async def update_task(
     task_id: str, payload: TaskUpdate, db: AsyncSession = Depends(get_db)
 ) -> Task:
     task = await _get_or_404(db, task_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    reject_null_fields(changes, _REQUIRED_FIELDS)
+    for field, value in changes.items():
         setattr(task, field, value)
     await db.commit()
     await db.refresh(task)

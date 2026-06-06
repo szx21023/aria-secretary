@@ -26,8 +26,13 @@ async def client():
         await conn.run_sync(Base.metadata.create_all)
 
     async def override_get_db():
+        # 與正式 get_db 一致：例外時 rollback 再 re-raise，避免測試與正式行為分歧
         async with test_session() as session:
-            yield session
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
 
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)

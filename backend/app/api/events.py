@@ -4,12 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.helpers import reject_null_fields
 from app.db import get_db
 from app.models.event import Event
 from app.schemas.event import EventCreate, EventRead, EventUpdate
 from app.services.scheduling import INTERVAL_ERROR, interval_ok
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+
+# Event 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
+_REQUIRED_FIELDS = frozenset({"title", "start_at", "end_at", "category", "status"})
 
 
 async def _get_or_404(db: AsyncSession, event_id: str) -> Event:
@@ -54,17 +58,13 @@ async def update_event(
 ) -> Event:
     event = await _get_or_404(db, event_id)
     changes = payload.model_dump(exclude_unset=True)
+    reject_null_fields(changes, _REQUIRED_FIELDS)
 
-    # 跨欄位規則必須在「合併進現有行程後」才驗證得了：部分更新可能只送了
-    # start_at 或 end_at 其中一個，得跟資料庫裡的另一半比對。同時擋掉顯式 null
-    # （兩者皆為 NOT NULL 欄位），否則會在比較或 commit 時炸成 500。
+    # 跨欄位規則只能在「合併進現有行程後」才驗證得了：部分更新可能只送了
+    # start_at 或 end_at 其中一個，得跟資料庫裡的另一半比對。null 已被
+    # reject_null_fields 擋掉，所以這裡 new_start / new_end 必為非 None。
     new_start = changes.get("start_at", event.start_at)
     new_end = changes.get("end_at", event.end_at)
-    if new_start is None or new_end is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="start_at / end_at 不可為 null",
-        )
     if not interval_ok(new_start, new_end):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=INTERVAL_ERROR

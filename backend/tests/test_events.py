@@ -112,6 +112,13 @@ async def test_patch_start_moved_past_end(client: AsyncClient):
     assert r.status_code == 422
 
 
+async def test_patch_null_title_is_422_not_409(client: AsyncClient):
+    # 顯式 null 到 NOT NULL 欄位是請求格式錯誤 → 422，不該被 IntegrityError handler 蓋成 409
+    created = (await client.post("/api/events", json=_payload())).json()
+    r = await client.patch(f"/api/events/{created['id']}", json={"title": None})
+    assert r.status_code == 422
+
+
 async def test_patch_missing_404(client: AsyncClient):
     assert (await client.patch("/api/events/nope", json={"title": "x"})).status_code == 404
 

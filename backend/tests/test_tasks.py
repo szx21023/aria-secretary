@@ -36,3 +36,22 @@ async def test_missing_404(client: AsyncClient):
     assert (await client.get("/api/tasks/nope")).status_code == 404
     assert (await client.patch("/api/tasks/nope", json={"done": True})).status_code == 404
     assert (await client.delete("/api/tasks/nope")).status_code == 404
+
+
+async def test_patch_null_required_field_is_422(client: AsyncClient):
+    created = (await client.post("/api/tasks", json={"title": "x"})).json()
+    assert (await client.patch(f"/api/tasks/{created['id']}", json={"title": None})).status_code == 422
+    assert (await client.patch(f"/api/tasks/{created['id']}", json={"done": None})).status_code == 422
+
+
+async def test_naive_due_at_coerced_to_utc(client: AsyncClient):
+    r = await client.post("/api/tasks", json={"title": "出差機票", "due_at": "2026-06-06T09:00:00"})
+    assert r.status_code == 201
+    assert r.json()["due_at"] == "2026-06-06T09:00:00Z"
+
+
+async def test_null_due_at_round_trips(client: AsyncClient):
+    # Optional 欄位顯式 null 應正常通過（走 None 分支、不套 UTC validator）
+    r = await client.post("/api/tasks", json={"title": "無期限", "due_at": None})
+    assert r.status_code == 201
+    assert r.json()["due_at"] is None
