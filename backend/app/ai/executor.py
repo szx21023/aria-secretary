@@ -57,7 +57,10 @@ async def _events_between(db: AsyncSession, start: datetime, end: datetime) -> l
 
 
 async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "day") -> str:
-    d = _parse_date(date)
+    try:
+        d = _parse_date(date)
+    except ValueError:
+        return f"日期格式無法解析：{date!r}，請用 YYYY-MM-DD，或省略代表今天。"
     now = _now_local().astimezone(timezone.utc)
     if range == "week":
         # 該日所在週的週一～週日
@@ -87,7 +90,10 @@ async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "
 async def find_free_slots_tool(
     db: AsyncSession, date: str | None = None, min_minutes: int = 30
 ) -> str:
-    d = _parse_date(date)
+    try:
+        d = _parse_date(date)
+    except ValueError:
+        return f"日期格式無法解析：{date!r}，請用 YYYY-MM-DD，或省略代表今天。"
     day_start, day_end = _local_day_bounds(d)
     events = await _events_between(db, day_start, day_end)
 
