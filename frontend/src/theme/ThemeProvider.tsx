@@ -12,12 +12,13 @@ import {
   DEFAULT_THEME,
   loadTheme,
   saveTheme,
+  type PresetId,
   type Theme,
 } from "./theme";
 
 interface ThemeApi {
   theme: Theme;
-  setPreset: (id: string) => void;
+  setPreset: (id: PresetId) => void;
   setGlow: (glow: number) => void;
   reset: () => void;
 }

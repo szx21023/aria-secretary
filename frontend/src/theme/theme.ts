@@ -6,20 +6,30 @@ export interface Preset {
   id: string;
   label: string;
   /** [acc1, acc2, acc3] oklch 色相（度數），對應 --acc1/2/3 */
-  acc: [number, number, number];
+  acc: readonly [number, number, number];
 }
 
 // acc[0] 是主色相（Logo／導覽／按鈕／標題漸層），acc[1] 次色相，acc[2] 第三色相（多用於 glow）。
-export const PRESETS: Preset[] = [
+// PRESETS 是「合法 preset」的唯一真實來源：`as const` 保留字面量，PresetId 由此推導，
+// 多一個少一個色票都會自動反映到型別，呼叫端打錯 id 會直接編譯失敗。
+export const PRESETS = [
   { id: "aurora", label: "極光紫", acc: [300, 215, 175] }, // 預設，對齊原型
   { id: "ocean", label: "海洋藍", acc: [250, 220, 195] },
   { id: "sunset", label: "暮霞橙", acc: [40, 10, 330] },
   { id: "forest", label: "森林綠", acc: [150, 175, 125] },
   { id: "rose", label: "玫瑰粉", acc: [350, 320, 25] },
-];
+] as const satisfies readonly Preset[];
+
+/** 合法的 preset id（封閉集合，由 PRESETS 推導）。 */
+export type PresetId = (typeof PRESETS)[number]["id"];
+
+/** 執行期守衛：把來自 localStorage 等外部來源的未知值收斂回 PresetId。 */
+export function isPresetId(v: unknown): v is PresetId {
+  return PRESETS.some((p) => p.id === v);
+}
 
 export interface Theme {
-  preset: string;
+  preset: PresetId;
   glow: number; // 0..1
 }
 
@@ -49,11 +59,9 @@ export function loadTheme(): Theme {
     if (!raw) return DEFAULT_THEME;
     const parsed = JSON.parse(raw) as Partial<Theme>;
     return {
-      // 只認仍存在的 preset id；舊版改名/移除的 id 會被 presetById 退回預設色，
-      // 但若原樣留著，SettingsPanel 會比對不到任何色票而呈現「沒選取」的死狀態。
-      preset: PRESETS.some((p) => p.id === parsed.preset)
-        ? (parsed.preset as string)
-        : DEFAULT_THEME.preset,
+      // 只認仍存在的 preset id；舊版改名/移除的 id 會退回預設色，
+      // 否則 SettingsPanel 會比對不到任何色票而呈現「沒選取」的死狀態。
+      preset: isPresetId(parsed.preset) ? parsed.preset : DEFAULT_THEME.preset,
       glow: typeof parsed.glow === "number" ? clamp01(parsed.glow) : DEFAULT_THEME.glow,
     };
   } catch (e) {
