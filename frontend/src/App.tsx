@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AIRail } from "./components/AIRail";
 import { EventDetail } from "./components/EventDetail";
 import { Nav, type ViewId } from "./components/Nav";
+import { SettingsPanel } from "./components/SettingsPanel";
 import {
   useAddTask,
   useEvents,
@@ -20,6 +21,7 @@ import { TodayView } from "./views/TodayView";
 export default function App() {
   const [view, setView] = useState<ViewId>("today");
   const [detail, setDetail] = useState<Event | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const events = useEvents();
   const tasks = useTasks();
@@ -43,7 +45,12 @@ export default function App() {
       <div className="s-glow s-g2" />
       <div className="s-glow s-g3" />
 
-      <Nav view={view} onChange={setView} reminderCount={activeReminders} />
+      <Nav
+        view={view}
+        onChange={setView}
+        reminderCount={activeReminders}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
       <main className="s-main">
         {error ? (
@@ -90,6 +97,7 @@ export default function App() {
       <AIRail />
 
       {detail && <EventDetail ev={detail} onClose={() => setDetail(null)} />}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
