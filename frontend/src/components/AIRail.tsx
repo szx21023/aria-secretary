@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useChat } from "../hooks/useChat";
+import { useChatContext } from "../hooks/ChatContext";
 import { Icon } from "../lib/icons";
 
 const CHIPS = ["今天有哪些空檔？", "今天有什麼行程？", "這週的安排", "下午有空嗎？"];
 
 export function AIRail() {
-  const { messages, thinking, send } = useChat();
+  const { messages, thinking, send } = useChatContext();
   const [val, setVal] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
 

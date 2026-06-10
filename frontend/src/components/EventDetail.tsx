@@ -1,5 +1,6 @@
+import { useChatContext } from "../hooks/ChatContext";
 import { CAT } from "../lib/categories";
-import { durationMin, fmtHours, fmtTime } from "../lib/format";
+import { durationMin, fmtHours, fmtMonthDay, fmtTime } from "../lib/format";
 import { Icon } from "../lib/icons";
 import type { Event } from "../lib/types";
 
@@ -9,8 +10,17 @@ interface Props {
 }
 
 export function EventDetail({ ev, onClose }: Props) {
+  const { send, thinking } = useChatContext();
   const c = CAT[ev.category];
   const mins = durationMin(ev.start_at, ev.end_at);
+
+  // 把行程資訊組成一句自然語言丟進對話，秘書再追問要改到何時（同原型體驗）。
+  // 帶上日期＋時間，避免同名行程被改錯。
+  const askReschedule = () => {
+    const when = `${fmtMonthDay(new Date(ev.start_at))} ${fmtTime(ev.start_at)}`;
+    send(`請幫我把「${ev.title}」（${when}）改期`);
+    onClose();
+  };
 
   return (
     <div className="s-pop-back" onClick={onClose}>
@@ -60,8 +70,12 @@ export function EventDetail({ ev, onClose }: Props) {
           <button className="s-btn" onClick={onClose}>
             關閉
           </button>
-          {/* M3 接上 AI 後改為「請秘書改期」送進對話 */}
-          <button className="s-btn primary" disabled title="AI 對話將於 M3 啟用">
+          <button
+            className="s-btn primary"
+            onClick={askReschedule}
+            disabled={thinking}
+            title={thinking ? "秘書正在處理上一則訊息…" : "送進對話請秘書改期"}
+          >
             請秘書改期
           </button>
         </div>

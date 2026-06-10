@@ -13,9 +13,10 @@ interface NavProps {
   view: ViewId;
   onChange: (v: ViewId) => void;
   reminderCount?: number;
+  onOpenSettings?: () => void;
 }
 
-export function Nav({ view, onChange, reminderCount = 0 }: NavProps) {
+export function Nav({ view, onChange, reminderCount = 0, onOpenSettings }: NavProps) {
   return (
     <nav className="s-nav">
       <div className="s-logo">A</div>
@@ -35,7 +36,7 @@ export function Nav({ view, onChange, reminderCount = 0 }: NavProps) {
         ))}
       </div>
       <div className="s-nav-sp" />
-      <div className="s-ni">
+      <div className="s-ni" onClick={onOpenSettings}>
         <Icon name="settings" />
         <span className="s-tip">設定</span>
       </div>

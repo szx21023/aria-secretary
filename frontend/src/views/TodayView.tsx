@@ -139,6 +139,7 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
               <small>{undone.length} 項未完成</small>
             </div>
             <div style={{ paddingBottom: 10 }}>
+              {undone.length === 0 && <div className="s-empty">待辦都清空了 🎉</div>}
               {undone.slice(0, 4).map((t) => (
                 <div key={t.id} className="s-mini-task" onClick={() => onToggleTask(t)}>
                   <span className="s-check">
@@ -160,6 +161,7 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
               <small>{upcoming.length} 則</small>
             </div>
             <div style={{ paddingBottom: 10 }}>
+              {upcoming.length === 0 && <div className="s-empty">目前沒有啟用中的提醒</div>}
               {upcoming.map((r) => (
                 <div key={r.id} className="s-mini-task" style={{ cursor: "default" }}>
                   <span
