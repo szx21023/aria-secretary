@@ -8,6 +8,7 @@ import {
 
 import {
   applyTheme,
+  clamp01,
   DEFAULT_THEME,
   loadTheme,
   saveTheme,
@@ -35,7 +36,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const api: ThemeApi = {
     theme,
     setPreset: (preset) => setTheme((t) => ({ ...t, preset })),
-    setGlow: (glow) => setTheme((t) => ({ ...t, glow })),
+    // 在唯一的寫入點就夾住 0..1，讓 theme.glow 對所有讀者都成立（不只 applyTheme）
+    setGlow: (glow) => setTheme((t) => ({ ...t, glow: clamp01(glow) })),
     reset: () => setTheme(DEFAULT_THEME),
   };
 

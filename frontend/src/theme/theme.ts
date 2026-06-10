@@ -27,7 +27,7 @@ export const DEFAULT_THEME: Theme = { preset: "aurora", glow: 0.5 };
 
 const STORAGE_KEY = "aria.theme";
 
-const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+export const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export function presetById(id: string): Preset {
   return PRESETS.find((p) => p.id === id) ?? PRESETS[0];
@@ -49,11 +49,17 @@ export function loadTheme(): Theme {
     if (!raw) return DEFAULT_THEME;
     const parsed = JSON.parse(raw) as Partial<Theme>;
     return {
-      preset: typeof parsed.preset === "string" ? parsed.preset : DEFAULT_THEME.preset,
+      // 只認仍存在的 preset id；舊版改名/移除的 id 會被 presetById 退回預設色，
+      // 但若原樣留著，SettingsPanel 會比對不到任何色票而呈現「沒選取」的死狀態。
+      preset: PRESETS.some((p) => p.id === parsed.preset)
+        ? (parsed.preset as string)
+        : DEFAULT_THEME.preset,
       glow: typeof parsed.glow === "number" ? clamp01(parsed.glow) : DEFAULT_THEME.glow,
     };
-  } catch {
-    // localStorage 不可用或內容壞掉都退回預設，不該讓設定讀取拖垮整個 app
+  } catch (e) {
+    // localStorage 不可用或內容壞掉都退回預設，不該讓設定讀取拖垮整個 app。
+    // 對齊 useChat 的慣例：壞掉的持久化資料留個 log 方便日後追（saveTheme 則刻意不 log）。
+    console.error("讀取主題設定失敗，退回預設", e);
     return DEFAULT_THEME;
   }
 }
