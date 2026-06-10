@@ -23,6 +23,9 @@ export function RemindersView({ reminders, onToggleReminder }: Props) {
 
       <div className="s-scroll">
         <div className="s-card">
+          {reminders.length === 0 && (
+            <div className="s-empty">還沒有任何提醒，跟秘書說一聲就能加進來 🔔</div>
+          )}
           {reminders.map((r) => {
             const meta = REMINDER_META[r.kind];
             return (
