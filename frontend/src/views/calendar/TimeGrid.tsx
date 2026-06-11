@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef } from "react";
 
-import { CAT } from "../../lib/categories";
+import { catOf } from "../../lib/categories";
 import { durationMin, fmtTime, minuteOfDay, sameLocalDay, WEEK_LABEL } from "../../lib/format";
 import type { Event } from "../../lib/types";
 
 const PXH = 62; // 每小時的像素高度
-const HOURS = Array.from({ length: 24 }, (_, i) => i); // 整天 00:00–23:00
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 24 條時間列，涵蓋整天 00:00–24:00（標籤顯示 00:00–23:00）
 
 interface Props {
   /** 要顯示的天數欄：日視圖傳 1 天、週視圖傳 7 天。 */
@@ -60,7 +60,7 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                 ))}
                 {di === todayIdx && <div className="s-nowline" style={{ top: nowTop }} />}
                 {dayEvents.map((e) => {
-                  const c = CAT[e.category];
+                  const c = catOf(e.category);
                   const top = (minuteOfDay(e.start_at) / 60) * PXH;
                   const height = Math.max((durationMin(e.start_at, e.end_at) / 60) * PXH - 3, 26);
                   const done = +new Date(e.end_at) <= +now;
@@ -80,7 +80,8 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                       <b>{e.title}</b>
                       {height > 40 && (
                         <small>
-                          {fmtTime(e.start_at)} · {e.location}
+                          {fmtTime(e.start_at)}
+                          {e.location && ` · ${e.location}`}
                         </small>
                       )}
                     </div>

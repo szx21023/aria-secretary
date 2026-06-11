@@ -76,8 +76,13 @@ export function CalendarView({ events, onOpenEvent }: Props) {
     title = dayLabel(anchor, now);
     sub = `${anchor.getMonth() + 1}月${anchor.getDate()}日 · 星期${WEEK_LABEL[anchor.getDay()]}`;
   } else if (mode === "week") {
-    const weekNo = Math.ceil(
-      ((+startOfWeekMonday(anchor) - +new Date(anchor.getFullYear(), 0, 1)) / DAY_MS + 1) / 7,
+    // 近似週數：今年第幾個 7 天區塊（從 1/1 起算，非 ISO 週，跨年邊界可能差 1）。
+    // clamp 至 1 以避免本週的週一落在去年時算出第 0 週或負數。
+    const weekNo = Math.max(
+      1,
+      Math.ceil(
+        ((+startOfWeekMonday(anchor) - +new Date(anchor.getFullYear(), 0, 1)) / DAY_MS + 1) / 7,
+      ),
     );
     title = weekLabel(anchor, now);
     sub = `${fmtMonthDay(weekDays[0])} – ${fmtMonthDay(weekDays[6])} · 第 ${weekNo} 週`;
@@ -87,7 +92,7 @@ export function CalendarView({ events, onOpenEvent }: Props) {
       return d.getMonth() === anchor.getMonth() && d.getFullYear() === anchor.getFullYear();
     }).length;
     title = monthLabel(anchor, now);
-    sub = `本月 ${count} 個行程`;
+    sub = `${monthLabel(anchor, now)} ${count} 個行程`;
   }
 
   return (

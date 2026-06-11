@@ -1,4 +1,4 @@
-import { CAT } from "../../lib/categories";
+import { catOf } from "../../lib/categories";
 import { sameLocalDay, startOfWeekMonday } from "../../lib/format";
 import type { Event } from "../../lib/types";
 
@@ -51,7 +51,7 @@ export function MonthGrid({ anchor, events, now, onOpenEvent, onPickDay }: Props
             >
               <span className="s-cal-daynum">{date.getDate()}</span>
               {shown.map((e) => {
-                const c = CAT[e.category];
+                const c = catOf(e.category);
                 return (
                   <div
                     key={e.id}
