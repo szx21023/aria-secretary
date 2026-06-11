@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { CAT } from "../lib/categories";
 import {
   durationMin,
@@ -21,9 +23,22 @@ interface Props {
   onOpenEvent: (e: Event) => void;
 }
 
+// weekOffset → 相對本週的標題（0=本週、-1=上週、+1=下週、其餘給相對週數）。
+function weekLabel(offset: number): string {
+  if (offset === 0) return "本週";
+  if (offset === -1) return "上週";
+  if (offset === 1) return "下週";
+  return offset < 0 ? `${-offset} 週前` : `${offset} 週後`;
+}
+
 export function CalendarView({ events, onOpenEvent }: Props) {
+  // 以「本週」為基準，左右箭頭調整週偏移；0 才是當前真實週。
+  const [weekOffset, setWeekOffset] = useState(0);
+  const isCurrentWeek = weekOffset === 0;
+
   const now = new Date();
   const weekStart = startOfWeekMonday(now);
+  weekStart.setDate(weekStart.getDate() + weekOffset * 7);
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
@@ -31,7 +46,8 @@ export function CalendarView({ events, onOpenEvent }: Props) {
   });
   const hours = Array.from({ length: H1 - H0 }, (_, i) => H0 + i);
   const nowTop = ((now.getHours() * 60 + now.getMinutes()) - H0 * 60) / 60 * PXH;
-  const todayCol = weekdayMon1(now); // 1..7
+  // 今日高亮／now-line 只在實際本週才有意義（其他週沒有「今天」這一欄）
+  const todayCol = isCurrentWeek ? weekdayMon1(now) : 0; // 1..7，非本週為 0（不命中任何欄）
 
   // 近似週數＝今年第幾個 7 天區塊（從 1/1 起算，非 ISO 週，跨年邊界可能差 1）
   const weekNo = Math.ceil(
@@ -45,21 +61,21 @@ export function CalendarView({ events, onOpenEvent }: Props) {
           <div className="s-eyebrow">
             {weekStart.getFullYear()} 年 {weekStart.getMonth() + 1} 月
           </div>
-          <h1 className="s-h1">本週</h1>
+          <h1 className="s-h1">{weekLabel(weekOffset)}</h1>
           <div className="s-h-sub">
             {fmtMonthDay(days[0])} – {fmtMonthDay(days[6])} · 第 {weekNo} 週
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {/* TODO(日/月視圖)：目前僅實作週視圖。日視圖與月視圖尚未開發，
+              在補上之前先不放「日」「月」按鈕，避免點了沒反應的死按鈕。 */}
           <div className="s-seg">
-            <button>日</button>
             <button className="on">週</button>
-            <button>月</button>
           </div>
-          <div className="s-iconbtn">
+          <div className="s-iconbtn" onClick={() => setWeekOffset((w) => w - 1)}>
             <Icon name="chevL" />
           </div>
-          <div className="s-iconbtn">
+          <div className="s-iconbtn" onClick={() => setWeekOffset((w) => w + 1)}>
             <Icon name="chevR" />
           </div>
         </div>
