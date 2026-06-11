@@ -1,4 +1,4 @@
-import { CAT, REMINDER_META } from "../lib/categories";
+import { catOf, REMINDER_META } from "../lib/categories";
 import { deriveStatus, durationMin, fmtDate, fmtHours, fmtTime, isToday } from "../lib/format";
 import { Icon } from "../lib/icons";
 import { freeHoursToday } from "../lib/schedule";
@@ -58,7 +58,7 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
           <div className="s-tl">
             {today.length === 0 && <div className="s-empty">今天沒有行程，好好休息 🙂</div>}
             {today.map((e) => {
-              const c = CAT[e.category];
+              const c = catOf(e.category);
               const state = deriveStatus(e, now);
               return (
                 <div

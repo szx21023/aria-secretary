@@ -158,6 +158,25 @@ body{
 .s-nowline{ position:absolute; left:0; right:0; height:2px; background:oklch(0.78 0.16 25); z-index:5; }
 .s-nowline::before{ content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:oklch(0.78 0.16 25); }
 
+/* ---------- CALENDAR · month ---------- */
+.s-cal-month{ flex:1; min-height:0; display:flex; flex-direction:column;
+  border:1px solid oklch(1 0 0 / 0.08); border-radius:var(--radius); overflow:hidden; background:oklch(1 0 0 / 0.02); }
+.s-cal-mhead{ display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid oklch(1 0 0 / 0.07); }
+.s-cal-mh{ padding:10px 0; text-align:center; font-size:11px; color:oklch(0.65 0.03 280); letter-spacing:.05em; }
+.s-cal-mbody{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(7,1fr);
+  grid-auto-rows:minmax(84px,1fr); overflow-y:auto; }
+.s-cal-cell{ border-right:1px solid oklch(1 0 0 / 0.05); border-bottom:1px solid oklch(1 0 0 / 0.05);
+  padding:6px 6px 8px; display:flex; flex-direction:column; gap:3px; overflow:hidden; cursor:pointer; transition:.12s; }
+.s-cal-cell:hover{ background:oklch(1 0 0 / 0.035); }
+.s-cal-cell.dim{ opacity:.38; }
+.s-cal-daynum{ font-size:12.5px; font-weight:600; width:24px; height:24px; display:grid; place-items:center; flex:none; }
+.s-cal-cell.today .s-cal-daynum{ border-radius:50%; color:#fff;
+  background:linear-gradient(140deg,oklch(0.74 0.15 var(--acc1)),oklch(0.66 0.14 var(--acc2))); }
+.s-cal-chip{ font-size:11px; line-height:1.55; padding:1px 6px; border-radius:6px; border-left:3px solid;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; transition:.12s; }
+.s-cal-chip:hover{ filter:brightness(1.18); }
+.s-cal-more{ font-size:10.5px; color:oklch(0.6 0.03 280); padding-left:2px; }
+
 /* segmented control */
 .s-seg{ display:flex; gap:4px; background:oklch(1 0 0 / 0.05); border:1px solid oklch(1 0 0 / 0.09); border-radius:12px; padding:3px; }
 .s-seg button{ border:0; background:transparent; color:oklch(0.68 0.03 280); font:inherit; font-size:13px; padding:6px 14px; border-radius:9px; cursor:pointer; }

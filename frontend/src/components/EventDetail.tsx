@@ -1,5 +1,5 @@
 import { useChatContext } from "../hooks/ChatContext";
-import { CAT } from "../lib/categories";
+import { catOf } from "../lib/categories";
 import { durationMin, fmtHours, fmtMonthDay, fmtTime } from "../lib/format";
 import { Icon } from "../lib/icons";
 import type { Event } from "../lib/types";
@@ -11,7 +11,7 @@ interface Props {
 
 export function EventDetail({ ev, onClose }: Props) {
   const { send, thinking } = useChatContext();
-  const c = CAT[ev.category];
+  const c = catOf(ev.category);
   const mins = durationMin(ev.start_at, ev.end_at);
 
   // 把行程資訊組成一句自然語言丟進對話，秘書再追問要改到何時（同原型體驗）。

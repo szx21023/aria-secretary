@@ -59,7 +59,8 @@ export function fmtMonthDay(d: Date): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-const WEEK_LABEL = ["日", "一", "二", "三", "四", "五", "六"];
+/** 星期標籤，以 JS getDay() 索引（0=週日 … 6=週六）。 */
+export const WEEK_LABEL = ["日", "一", "二", "三", "四", "五", "六"];
 
 /** 「6月5日 · 星期五」式日期。 */
 export function fmtDate(d: Date): string {
