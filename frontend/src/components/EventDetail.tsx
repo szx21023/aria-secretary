@@ -29,18 +29,10 @@ export function EventDetail({ ev, onClose }: Props) {
           <Icon name="x" />
         </div>
         <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 12.5,
-            padding: "5px 12px",
-            borderRadius: 999,
-            background: `color-mix(in oklch, ${c.color} 22%, transparent)`,
-            color: c.color,
-          }}
+          className="s-cat-chip"
+          style={{ background: `color-mix(in oklch, ${c.color} 22%, transparent)`, color: c.color }}
         >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.color }} />
+          <span className="s-cat-chip-dot" style={{ background: c.color }} />
           {c.label}
         </span>
         <h3>{ev.title}</h3>

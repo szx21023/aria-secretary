@@ -108,9 +108,7 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
                     <Icon name="tick" strokeWidth={3} />
                   </span>
                   <span className="s-mt-x">{t.title}</span>
-                  {t.priority === "high" && (
-                    <span className="s-flag" style={{ background: "oklch(0.7 0.16 25)" }} />
-                  )}
+                  {t.priority === "high" && <span className="s-flag hi" />}
                   {t.due_at && <span className="s-mt-due">{fmtTime(t.due_at)}</span>}
                 </div>
               ))}
@@ -126,28 +124,15 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
               {upcoming.length === 0 && <div className="s-empty">目前沒有啟用中的提醒</div>}
               {upcoming.map((r) => (
                 <div key={r.id} className="s-mini-task" style={{ cursor: "default" }}>
-                  <span
-                    className="s-rem-ic"
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      background: "oklch(1 0 0 / 0.06)",
-                      color: REMINDER_META[r.kind].tint,
-                    }}
-                  >
-                    <Icon name={REMINDER_META[r.kind].icon} style={{ width: 16, height: 16 }} />
+                  <span className="s-rem-ic sm" style={{ color: REMINDER_META[r.kind].tint }}>
+                    <Icon name={REMINDER_META[r.kind].icon} />
                   </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="s-mt-x" style={{ fontWeight: 500 }}>
-                      {r.title}
-                    </div>
+                  <div className="s-mt-body">
+                    <div className="s-mt-x">{r.title}</div>
                     <div className="s-mt-due">{r.subtitle}</div>
                   </div>
                   {r.trigger_at && (
-                    <span className="s-mt-due" style={{ color: "oklch(0.8 0.1 var(--acc1))" }}>
-                      {fmtTime(r.trigger_at)}
-                    </span>
+                    <span className="s-mt-due acc">{fmtTime(r.trigger_at)}</span>
                   )}
                 </div>
               ))}

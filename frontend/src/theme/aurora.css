@@ -122,6 +122,14 @@ body{
 .s-mt-x{ font-size:14px; flex:1; }
 .s-mt-due{ font-size:11.5px; color:oklch(0.66 0.03 280); }
 .s-flag{ width:7px; height:7px; border-radius:50%; flex:none; }
+.s-flag.hi{ background:oklch(0.7 0.16 25); }
+/* 今日卡片內的提醒小圖示：比提醒頁的 .s-rem-ic 小一號 */
+.s-rem-ic.sm{ width:34px; height:34px; border-radius:10px; background:oklch(1 0 0 / 0.06); }
+.s-rem-ic.sm svg{ width:16px; height:16px; }
+/* 今日「即將提醒」列：標題+副標的可伸縮主體，min-width:0 讓長字省略不撐破 */
+.s-mt-body{ flex:1; min-width:0; }
+.s-mt-body .s-mt-x{ font-weight:500; }
+.s-mt-due.acc{ color:oklch(0.8 0.1 var(--acc1)); }
 
 /* ---------- CALENDAR · week ---------- */
 .s-cal{ display:flex; flex-direction:column; height:100%; }
@@ -239,6 +247,9 @@ body{
   background:linear-gradient(180deg, oklch(0.27 0.05 285 / 0.95), oklch(0.2 0.03 280 / 0.95));
   border:1px solid oklch(1 0 0 / 0.14); backdrop-filter:blur(24px); box-shadow:0 30px 70px oklch(0.06 0.02 280 / 0.7); }
 .s-pop h3{ margin:14px 0 6px; font-size:22px; font-weight:600; }
+/* 分類標籤膠囊（背景/文字色由分類資料決定，留在 inline style） */
+.s-cat-chip{ display:inline-flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 12px; border-radius:999px; }
+.s-cat-chip-dot{ width:7px; height:7px; border-radius:50%; }
 .s-pop .s-pop-meta{ display:flex; flex-direction:column; gap:11px; margin:18px 0; }
 .s-pop .row{ display:flex; align-items:center; gap:12px; font-size:14px; color:oklch(0.82 0.03 285); }
 .s-pop .row svg{ width:17px; height:17px; color:oklch(0.66 0.03 285); flex:none; }
