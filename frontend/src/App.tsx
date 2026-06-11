@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AIRail } from "./components/AIRail";
 import { EventDetail } from "./components/EventDetail";
@@ -17,6 +17,17 @@ import { CalendarView } from "./views/CalendarView";
 import { RemindersView } from "./views/RemindersView";
 import { TasksView } from "./views/TasksView";
 import { TodayView } from "./views/TodayView";
+
+/** 置中卡片，用於載入中／錯誤等整頁佔位狀態。 */
+function CenterCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="s-fadein" style={{ padding: 40 }}>
+      <div className="s-card">
+        <div className="s-empty">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [view, setView] = useState<ViewId>("today");
@@ -54,17 +65,9 @@ export default function App() {
 
       <main className="s-main">
         {error ? (
-          <div className="s-fadein" style={{ padding: 40 }}>
-            <div className="s-card">
-              <div className="s-empty">無法連線後端 — 請確認 API 是否啟動於 :8000</div>
-            </div>
-          </div>
+          <CenterCard>無法連線後端 — 請確認 API 是否啟動於 :8000</CenterCard>
         ) : loading ? (
-          <div className="s-fadein" style={{ padding: 40 }}>
-            <div className="s-card">
-              <div className="s-empty">載入中…</div>
-            </div>
-          </div>
+          <CenterCard>載入中…</CenterCard>
         ) : (
           <>
             {view === "today" && (

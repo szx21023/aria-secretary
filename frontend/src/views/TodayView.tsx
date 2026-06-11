@@ -1,46 +1,8 @@
 import { CAT, REMINDER_META } from "../lib/categories";
-import {
-  deriveStatus,
-  durationMin,
-  fmtDate,
-  fmtHours,
-  fmtTime,
-  isToday,
-  minuteOfDay,
-} from "../lib/format";
+import { deriveStatus, durationMin, fmtDate, fmtHours, fmtTime, isToday } from "../lib/format";
 import { Icon } from "../lib/icons";
+import { freeHoursToday } from "../lib/schedule";
 import type { Event, Reminder, Task } from "../lib/types";
-
-function freeHoursToday(todayEvents: Event[]): number {
-  // 粗估 9:00–18:00 工作窗內的空檔小時數。
-  const WIN_START = 9 * 60;
-  const WIN_END = 18 * 60;
-  // 取每個行程「落在工作窗內」的真實佔用區間（夾到窗內、丟掉窗外）
-  const spans = todayEvents
-    .map((e) => [
-      Math.max(WIN_START, minuteOfDay(e.start_at)),
-      Math.min(WIN_END, minuteOfDay(e.end_at)),
-    ])
-    .filter(([s, e]) => e > s)
-    .sort((a, b) => a[0] - b[0]);
-
-  // 合併重疊區間後再加總，避免兩個重疊行程被重複計算
-  let busy = 0;
-  let curStart = -1;
-  let curEnd = -1;
-  for (const [s, e] of spans) {
-    if (s > curEnd) {
-      busy += Math.max(0, curEnd - curStart);
-      [curStart, curEnd] = [s, e];
-    } else {
-      curEnd = Math.max(curEnd, e);
-    }
-  }
-  busy += Math.max(0, curEnd - curStart);
-
-  const free = Math.max(0, WIN_END - WIN_START - busy) / 60;
-  return Math.round(free * 10) / 10;
-}
 
 interface Props {
   events: Event[];

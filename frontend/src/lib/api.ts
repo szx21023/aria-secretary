@@ -14,8 +14,6 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  health: () => request<{ status: string; app: string }>("GET", "/api/health"),
-
   events: () => request<Event[]>("GET", "/api/events"),
 
   tasks: () => request<Task[]>("GET", "/api/tasks"),
