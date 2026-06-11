@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { CAT } from "../lib/categories";
 import {
@@ -13,8 +13,10 @@ import {
 import { Icon } from "../lib/icons";
 import type { Event } from "../lib/types";
 
-const H0 = 8;
-const H1 = 21;
+// 整天 00:00–24:00 全部畫出來，避免清晨／深夜行程被切在視窗外看不到；
+// 預設捲動位置由 bodyRef 的 effect 控制（落在日間），其餘時段往上／下捲即可。
+const H0 = 0;
+const H1 = 24;
 const PXH = 62;
 const DAYS = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -54,6 +56,15 @@ export function CalendarView({ events, onOpenEvent }: Props) {
     ((+weekStart - +new Date(weekStart.getFullYear(), 0, 1)) / 86400000 + 1) / 7,
   );
 
+  // 時間軸是整天 00:00–24:00，進場／切換週時捲到合理起點：
+  // 本週捲到「現在」前一小時（看得到 now-line），其他週捲到 07:00。
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const startHour = isCurrentWeek ? Math.max(0, now.getHours() - 1) : 7;
+    bodyRef.current?.scrollTo({ top: startHour * PXH });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在切換週時重新定位，now 取當下值即可
+  }, [weekOffset]);
+
   return (
     <div className="s-fadein" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="s-head">
@@ -90,7 +101,7 @@ export function CalendarView({ events, onOpenEvent }: Props) {
               <b>{days[i].getDate()}</b>
             </div>
           ))}
-          <div className="s-cal-body">
+          <div className="s-cal-body" ref={bodyRef}>
             <div className="s-cal-hours">
               {hours.map((h) => (
                 <div key={h} className="s-cal-hr">
