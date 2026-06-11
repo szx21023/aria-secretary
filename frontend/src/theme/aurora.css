@@ -132,7 +132,10 @@ body{
 .s-mt-due.acc{ color:oklch(0.8 0.1 var(--acc1)); }
 
 /* ---------- CALENDAR · week ---------- */
-.s-cal{ display:flex; flex-direction:column; height:100%; }
+/* flex:1 + min-height:0 才能扣掉上方 .s-head 後填滿剩餘高度；
+   用 height:100% 會忽略 header 高度而往下溢出，被 .s-main 的 overflow:hidden
+   從底部裁掉，導致深夜時段捲到底仍在視窗外（見 .s-cal-body 底部留白）。 */
+.s-cal{ display:flex; flex-direction:column; flex:1; min-height:0; }
 .s-cal-grid{ display:grid; grid-template-columns:56px repeat(7,1fr); flex:1; min-height:0;
   border:1px solid oklch(1 0 0 / 0.08); border-radius:var(--radius); overflow:hidden; background:oklch(1 0 0 / 0.02); }
 .s-cal-corner{ border-right:1px solid oklch(1 0 0 / 0.07); border-bottom:1px solid oklch(1 0 0 / 0.07); }
@@ -141,7 +144,7 @@ body{
 .s-cal-dh b{ font-size:18px; font-weight:600; }
 .s-cal-dh.today b{ display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%;
   background:linear-gradient(140deg,oklch(0.74 0.15 var(--acc1)),oklch(0.66 0.14 var(--acc2))); color:#fff; }
-.s-cal-body{ grid-column:1 / -1; display:grid; grid-template-columns:56px repeat(7,1fr); position:relative; overflow-y:auto; }
+.s-cal-body{ grid-column:1 / -1; display:grid; grid-template-columns:56px repeat(7,1fr); position:relative; overflow-y:auto; padding-bottom:20px; }
 .s-cal-hours{ display:flex; flex-direction:column; }
 .s-cal-hr{ height:62px; border-bottom:1px solid oklch(1 0 0 / 0.05); border-right:1px solid oklch(1 0 0 / 0.07);
   font-size:11px; color:oklch(0.55 0.03 280); text-align:right; padding:2px 7px 0 0; }
