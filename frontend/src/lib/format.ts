@@ -66,7 +66,7 @@ export function fmtDate(d: Date): string {
   return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${WEEK_LABEL[d.getDay()]}`;
 }
 
-/** 小時數 → 「0.5h」式時長標籤。 */
+/** 分鐘數 → 「0.5h」式時長標籤。 */
 export function fmtHours(minutes: number): string {
   return `${Math.round((minutes / 60) * 10) / 10}h`;
 }

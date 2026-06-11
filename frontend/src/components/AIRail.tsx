@@ -46,8 +46,8 @@ export function AIRail() {
       </div>
 
       <div className="s-chips">
-        {CHIPS.map((c, i) => (
-          <div key={i} className="s-chip" onClick={() => submit(c)}>
+        {CHIPS.map((c) => (
+          <div key={c} className="s-chip" onClick={() => submit(c)}>
             {c}
           </div>
         ))}

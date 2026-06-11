@@ -69,7 +69,7 @@ export function CalendarView({ events, onOpenEvent }: Props) {
         <div className="s-cal-grid">
           <div className="s-cal-corner" />
           {DAYS.map((d, i) => (
-            <div key={i} className={"s-cal-dh" + (i + 1 === todayCol ? " today" : "")}>
+            <div key={d} className={"s-cal-dh" + (i + 1 === todayCol ? " today" : "")}>
               <small>週{d}</small>
               <b>{days[i].getDate()}</b>
             </div>
