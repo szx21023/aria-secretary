@@ -39,7 +39,8 @@ export function EventDetail({ ev, onClose }: Props) {
         <div className="s-pop-meta">
           <div className="row">
             <Icon name="clock" />
-            {fmtTime(ev.start_at)} – {fmtTime(ev.end_at)}（{fmtHours(mins)}）
+            {fmtMonthDay(new Date(ev.start_at))} · {fmtTime(ev.start_at)} – {fmtTime(ev.end_at)}（
+            {fmtHours(mins)}）
           </div>
           <div className="row">
             <Icon name="pin" />
