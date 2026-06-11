@@ -282,8 +282,8 @@ aria-secretary/
 3. **M2 — 前端四視圖**：移植 4 個 view + Nav + theme，接真 API（先不做 AI）。畫面與原型一致。
 4. **M3 — AI 對話（讀）**：`/api/chat` streaming + system prompt + `get_schedule`/`find_free_slots`（唯讀工具）+ AIRail。
 5. **M4 — AI 對話（寫）**：加 create/reschedule/cancel/add_task/toggle 工具 + 衝突偵測 + `state_changed` 即時刷新。
-6. **M5 — 打磨**：對話歷史持久化、錯誤處理、loading/empty state、EventDetail「請秘書改期」、設定面板（主題）。
-7. **M6（可選）**：多使用者 + auth、Docker、部署、提醒實際觸發（背景排程）。
+6. **M5 — 打磨** ✅：對話歷史持久化（DB 落地 + `GET /api/chat/history`，含串流中斷的部分回覆復原）、錯誤處理（後端串流 try/except + 復原存檔；前端 retry/連線失敗訊息）、loading/empty state、EventDetail「請秘書改期」接上對話、設定面板（色彩主題 + 光暈強度，localStorage 持久化 + vitest）。
+7. **M6（可選）**：多使用者 + auth、Docker、部署、提醒實際觸發（背景排程）、多對話 thread（目前為單一全域 conversation）。
 
 ---
 
@@ -303,9 +303,9 @@ VITE_API_BASE=http://localhost:8000
 ---
 
 ## 9. 待你確認 / 決策點（實作前可再對齊）
-- [ ] 是否要**多使用者 + 登入**，或先單人本機使用（影響是否加 users/auth）。MVP 建議先單人。
-- [ ] 提醒（reminders）是否要**真的會在時間到時觸發通知**（需背景排程 / WebPush），或先只做清單管理。MVP 建議後者。
-- [ ] 「現在時間」用**真實系統時間**，還是沿用原型的固定情境（週五 11:12）方便 demo。建議真實時間 + seed 以今天為錨。
-- [ ] 主題設定面板要不要做（原 Tweaks）。可放 M5 或省略。
+- [x] 是否要**多使用者 + 登入** → MVP 先單人本機（未加 users/auth）。多使用者留 M6。
+- [x] 提醒（reminders）是否要**真的會在時間到時觸發通知** → MVP 先只做清單管理；實際觸發留 M6。
+- [x] 「現在時間」 → 用**真實系統時間** + seed 以「今天」為錨。
+- [x] 主題設定面板要不要做（原 Tweaks）→ M5 已做（色彩主題 + 光暈強度，localStorage 持久化）。
 
 > 下一步：你確認本計畫後，我從 **M0 骨架**開始建。

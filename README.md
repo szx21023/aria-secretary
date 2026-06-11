@@ -7,12 +7,15 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 ## 現況
 
-**M4 完成（AI 對話可寫入）** — 後端 FastAPI + SQLAlchemy(async) + SQLite，events/tasks/reminders
+**M5 完成（打磨）** — 後端 FastAPI + SQLAlchemy(async) + SQLite，events/tasks/reminders
 完整 CRUD 與排程服務；AI 對話層走真 Claude API（tool use）+ SSE 串流，秘書能讀也能增刪改行程／待辦，
-含衝突偵測回報與 `state_changed` 即時刷新前端。前端 Vite + React + TS 四視圖 + AIRail 對話側欄，
-完整復刻 Aurora 玻璃擬態視覺。後端測試 117 passed。
+含衝突偵測回報與 `state_changed` 即時刷新前端。對話歷史持久化（DB 落地，reload 不消失，含串流中斷的部分回覆復原），
+前端 Vite + React + TS 四視圖 + AIRail 對話側欄 + EventDetail「請秘書改期」+ 主題設定面板
+（色彩主題／光暈強度，localStorage 持久化），完整復刻 Aurora 玻璃擬態視覺。
+測試：後端 117 passed、前端 12 passed。
 
-里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨
+里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅
+（下一步：M6 可選 — 多使用者 + auth、Docker、部署、提醒實際觸發）
 
 ## 跑起來
 
