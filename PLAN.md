@@ -283,7 +283,7 @@ aria-secretary/
 4. **M3 — AI 對話（讀）**：`/api/chat` streaming + system prompt + `get_schedule`/`find_free_slots`（唯讀工具）+ AIRail。
 5. **M4 — AI 對話（寫）**：加 create/reschedule/cancel/add_task/toggle 工具 + 衝突偵測 + `state_changed` 即時刷新。
 6. **M5 — 打磨** ✅：對話歷史持久化（DB 落地 + `GET /api/chat/history`，含串流中斷的部分回覆復原）、錯誤處理（後端串流 try/except + 復原存檔；前端 retry/連線失敗訊息）、loading/empty state、EventDetail「請秘書改期」接上對話、設定面板（色彩主題 + 光暈強度，localStorage 持久化 + vitest）。
-7. **M6（可選）**：多使用者 + auth、Docker、部署、提醒實際觸發（背景排程）、多對話 thread（目前為單一全域 conversation）。
+7. **M6（可選）**：多使用者 + auth、Docker、部署、提醒實際觸發（背景排程）、多對話 thread（目前為單一全域 conversation）、行事曆日視圖／月視圖（目前僅週視圖；見 `CalendarView.tsx` 的 `TODO(日/月視圖)`）。
 
 ---
 
