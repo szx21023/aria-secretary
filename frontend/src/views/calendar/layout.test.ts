@@ -24,6 +24,12 @@ describe("eventBox", () => {
     expect(top + height).toBe(GRID_H); // 貼齊網格底，不溢出
   });
 
+  it("daySegment 文件允許的零長度區段 → 仍渲染 26px、不溢出網格", () => {
+    const { top, height } = eventBox({ startMin: 1440, endMin: 1440 });
+    expect(height).toBe(26);
+    expect(top + height).toBeLessThanOrEqual(GRID_H);
+  });
+
   it("整天區段（00:00–24:00）→ 貼齊網格、top 不為負", () => {
     const { top, height } = eventBox({ startMin: 0, endMin: 1440 });
     expect(top).toBe(0);

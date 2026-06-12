@@ -66,7 +66,8 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                   const c = catOf(e.category);
                   const { top, height } = eventBox(seg);
                   const done = +new Date(e.end_at) <= +now;
-                  // 跨夜延續段（事件不是這天開始的）標籤加「←」，表示從前一天延續而來
+                  // 跨夜延續段（事件不是這天開始的）加「←」表示從前一天延續而來：
+                  // 放時間標籤前；段落矮到沒有時間標籤時改放標題前，箭頭不消失
                   const cont = !sameLocalDay(new Date(e.start_at), date);
                   return (
                     <div
@@ -81,7 +82,10 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                         opacity: done ? 0.55 : 1,
                       }}
                     >
-                      <b>{e.title}</b>
+                      <b>
+                        {cont && height <= 40 && "← "}
+                        {e.title}
+                      </b>
                       {height > 40 && (
                         <small>
                           {cont && "← "}
