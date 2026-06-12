@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 
 import { catOf } from "../../lib/categories";
-import { durationMin, fmtTime, minuteOfDay, sameLocalDay, WEEK_LABEL } from "../../lib/format";
+import { daySegment, fmtTime, sameLocalDay, WEEK_LABEL } from "../../lib/format";
 import type { Event } from "../../lib/types";
 
 const PXH = 62; // 每小時的像素高度
@@ -52,17 +52,21 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
             ))}
           </div>
           {days.map((date, di) => {
-            const dayEvents = events.filter((e) => sameLocalDay(new Date(e.start_at), date));
+            // 跨日行程在每個重疊日各畫一段（clamp 在當天 00:00–24:00 內）
+            const dayEvents = events
+              .map((e) => ({ e, seg: daySegment(e.start_at, e.end_at, date) }))
+              .filter((x): x is { e: Event; seg: NonNullable<typeof x.seg> } => x.seg !== null);
             return (
               <div key={di} className="s-cal-col">
                 {HOURS.map((h) => (
                   <div key={h} className="hrline" />
                 ))}
                 {di === todayIdx && <div className="s-nowline" style={{ top: nowTop }} />}
-                {dayEvents.map((e) => {
+                {dayEvents.map(({ e, seg }) => {
                   const c = catOf(e.category);
-                  const top = (minuteOfDay(e.start_at) / 60) * PXH;
-                  const height = Math.max((durationMin(e.start_at, e.end_at) / 60) * PXH - 3, 26);
+                  const height = Math.max(((seg.endMin - seg.startMin) / 60) * PXH - 3, 26);
+                  // 深夜短行程套 min-height 後可能超出 24:00，把 top 一併 clamp 回網格內
+                  const top = Math.min((seg.startMin / 60) * PXH, 24 * PXH - height);
                   const done = +new Date(e.end_at) <= +now;
                   return (
                     <div

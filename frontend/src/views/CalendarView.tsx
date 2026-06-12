@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fmtMonthDay, startOfWeekMonday, WEEK_LABEL } from "../lib/format";
 import { Icon } from "../lib/icons";
@@ -47,7 +47,12 @@ interface Props {
 }
 
 export function CalendarView({ events, onOpenEvent }: Props) {
-  const now = new Date();
+  // now 走每分鐘的 tick，讓 now-line／「已結束」淡化／「今天」標題開著過夜也不 stale
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [mode, setMode] = useState<ViewMode>("week");
   // anchor 為「目前檢視的基準日」（在地午夜）。日/週/月三模式都從它推算要顯示的範圍。
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
