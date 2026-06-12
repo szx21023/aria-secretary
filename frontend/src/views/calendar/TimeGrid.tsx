@@ -66,6 +66,8 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                   const c = catOf(e.category);
                   const { top, height } = eventBox(seg);
                   const done = +new Date(e.end_at) <= +now;
+                  // 跨夜延續段（事件不是這天開始的）標籤加「←」，表示從前一天延續而來
+                  const cont = !sameLocalDay(new Date(e.start_at), date);
                   return (
                     <div
                       key={e.id}
@@ -82,6 +84,7 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                       <b>{e.title}</b>
                       {height > 40 && (
                         <small>
+                          {cont && "← "}
                           {fmtTime(e.start_at)}
                           {e.location && ` · ${e.location}`}
                         </small>
