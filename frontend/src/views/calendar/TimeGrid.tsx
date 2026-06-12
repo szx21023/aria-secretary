@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef } from "react";
 
 import { catOf } from "../../lib/categories";
-import { durationMin, fmtTime, minuteOfDay, sameLocalDay, WEEK_LABEL } from "../../lib/format";
+import { daySegment, fmtTime, sameLocalDay, WEEK_LABEL } from "../../lib/format";
 import type { Event } from "../../lib/types";
+import { eventBox, PXH } from "./layout";
 
-const PXH = 62; // 每小時的像素高度
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 24 條時間列，涵蓋整天 00:00–24:00（標籤顯示 00:00–23:00）
 
 interface Props {
@@ -52,18 +52,23 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
             ))}
           </div>
           {days.map((date, di) => {
-            const dayEvents = events.filter((e) => sameLocalDay(new Date(e.start_at), date));
+            // 跨日行程在每個重疊日各畫一段（clamp 在當天 00:00–24:00 內）
+            const dayEvents = events
+              .map((e) => ({ e, seg: daySegment(e.start_at, e.end_at, date) }))
+              .filter((x): x is { e: Event; seg: NonNullable<typeof x.seg> } => x.seg !== null);
             return (
               <div key={di} className="s-cal-col">
                 {HOURS.map((h) => (
                   <div key={h} className="hrline" />
                 ))}
                 {di === todayIdx && <div className="s-nowline" style={{ top: nowTop }} />}
-                {dayEvents.map((e) => {
+                {dayEvents.map(({ e, seg }) => {
                   const c = catOf(e.category);
-                  const top = (minuteOfDay(e.start_at) / 60) * PXH;
-                  const height = Math.max((durationMin(e.start_at, e.end_at) / 60) * PXH - 3, 26);
+                  const { top, height } = eventBox(seg);
                   const done = +new Date(e.end_at) <= +now;
+                  // 跨夜延續段（事件不是這天開始的）加「←」表示從前一天延續而來：
+                  // 放時間標籤前；段落矮到沒有時間標籤時改放標題前，箭頭不消失
+                  const cont = !sameLocalDay(new Date(e.start_at), date);
                   return (
                     <div
                       key={e.id}
@@ -77,9 +82,13 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                         opacity: done ? 0.55 : 1,
                       }}
                     >
-                      <b>{e.title}</b>
+                      <b>
+                        {cont && height <= 40 && "← "}
+                        {e.title}
+                      </b>
                       {height > 40 && (
                         <small>
+                          {cont && "← "}
                           {fmtTime(e.start_at)}
                           {e.location && ` · ${e.location}`}
                         </small>

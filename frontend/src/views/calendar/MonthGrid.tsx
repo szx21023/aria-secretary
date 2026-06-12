@@ -1,5 +1,5 @@
 import { catOf } from "../../lib/categories";
-import { sameLocalDay, startOfWeekMonday } from "../../lib/format";
+import { daySegment, sameLocalDay, startOfWeekMonday } from "../../lib/format";
 import type { Event } from "../../lib/types";
 
 const MAX_CHIPS = 3; // 每格最多顯示幾條，其餘收合成「+N 更多」
@@ -38,8 +38,9 @@ export function MonthGrid({ anchor, events, now, onOpenEvent, onPickDay }: Props
         {cells.map((date, i) => {
           const dim = date.getMonth() !== month; // 非當月（前後月補滿格）淡化
           const isToday = sameLocalDay(date, now);
+          // 跨日行程在每個重疊日都顯示小條
           const dayEvents = events
-            .filter((e) => sameLocalDay(new Date(e.start_at), date))
+            .filter((e) => daySegment(e.start_at, e.end_at, date) !== null)
             .sort((a, b) => +new Date(a.start_at) - +new Date(b.start_at));
           const shown = dayEvents.slice(0, MAX_CHIPS);
           const extra = dayEvents.length - shown.length;

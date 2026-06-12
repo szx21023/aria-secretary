@@ -24,6 +24,28 @@ export function durationMin(startIso: string, endIso: string): number {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
 }
 
+/**
+ * 事件落在某在地日（00:00–24:00）內的可見區段，以「該日第幾分鐘」表示。
+ * 跨日行程在每個重疊日各得一段：起點 clamp 到 0、迄點 clamp 到 1440，
+ * 跨多日的中間日得到整天 0–1440。與該日不重疊回傳 null；恰好在午夜結束的不算入隔天。
+ * 端點以分鐘四捨五入，秒級重疊可能得到 startMin === endMin 的零長度區段（本 app 行程為分鐘粒度）。
+ */
+export function daySegment(
+  startIso: string,
+  endIso: string,
+  day: Date,
+): { startMin: number; endMin: number } | null {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const dayEnd = dayStart + 86_400_000;
+  const s = new Date(startIso).getTime();
+  const e = new Date(endIso).getTime();
+  if (e <= dayStart || s >= dayEnd) return null;
+  return {
+    startMin: Math.max(0, Math.round((s - dayStart) / 60000)),
+    endMin: Math.min(1440, Math.round((e - dayStart) / 60000)),
+  };
+}
+
 /** 是否為同一天（在地）。 */
 export function sameLocalDay(a: Date, b: Date): boolean {
   return (
