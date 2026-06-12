@@ -288,7 +288,7 @@ aria-secretary/
 > 行事曆三視圖（日／週／月）已於後續補上（`views/calendar/` 的 `TimeGrid`＝日/週共用、`MonthGrid`＝月）。
 
 ### 行事曆已知待修（PR review 後盤點，刻意未塞進三視圖 PR）
-- [x] **跨午夜／跨日行程渲染** — 已修：`lib/format` 新增 `daySegment()`（事件在某日 00:00–24:00 的可見區段），`TimeGrid`/`MonthGrid` 改用它過濾＋clamp 高度，跨日行程每個重疊日各畫一段。
+- [x] **跨午夜／跨日行程渲染** — 已修：`lib/format` 新增 `daySegment()`（事件在某日 00:00–24:00 的可見區段），`TimeGrid` 改用它過濾＋clamp 高度、`MonthGrid` 改用它過濾，跨日行程每個重疊日各畫一段。
 - [x] **`now` 不會 tick** — 已修：`CalendarView` 的 `now` 改為 state＋每分鐘 `setInterval` 更新（unmount 時清除）。
 
 ---

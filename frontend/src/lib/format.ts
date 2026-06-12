@@ -26,8 +26,9 @@ export function durationMin(startIso: string, endIso: string): number {
 
 /**
  * 事件落在某在地日（00:00–24:00）內的可見區段，以「該日第幾分鐘」表示。
- * 跨午夜／跨多日的行程會在每個重疊日各得一段（首日 clamp 到 1440、後續日從 0 起算）；
- * 與該日不重疊回傳 null。恰好在午夜結束的行程不算入隔天。
+ * 跨日行程在每個重疊日各得一段：起點 clamp 到 0、迄點 clamp 到 1440，
+ * 跨多日的中間日得到整天 0–1440。與該日不重疊回傳 null；恰好在午夜結束的不算入隔天。
+ * 端點以分鐘四捨五入，秒級重疊可能得到 startMin === endMin 的零長度區段（本 app 行程為分鐘粒度）。
  */
 export function daySegment(
   startIso: string,
