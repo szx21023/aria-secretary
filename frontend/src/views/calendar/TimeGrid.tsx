@@ -3,8 +3,8 @@ import { useLayoutEffect, useRef } from "react";
 import { catOf } from "../../lib/categories";
 import { daySegment, fmtTime, sameLocalDay, WEEK_LABEL } from "../../lib/format";
 import type { Event } from "../../lib/types";
+import { eventBox, PXH } from "./layout";
 
-const PXH = 62; // 每小時的像素高度
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 24 條時間列，涵蓋整天 00:00–24:00（標籤顯示 00:00–23:00）
 
 interface Props {
@@ -64,9 +64,7 @@ export function TimeGrid({ days, events, now, onOpenEvent }: Props) {
                 {di === todayIdx && <div className="s-nowline" style={{ top: nowTop }} />}
                 {dayEvents.map(({ e, seg }) => {
                   const c = catOf(e.category);
-                  const height = Math.max(((seg.endMin - seg.startMin) / 60) * PXH - 3, 26);
-                  // 深夜短行程套 min-height 後可能超出 24:00，把 top 一併 clamp 回網格內
-                  const top = Math.min((seg.startMin / 60) * PXH, 24 * PXH - height);
+                  const { top, height } = eventBox(seg);
                   const done = +new Date(e.end_at) <= +now;
                   return (
                     <div
