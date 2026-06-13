@@ -10,6 +10,8 @@ class Conversation(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "conversations"
 
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 最後一個透過 LINE 跟秘書講話的人；推播找不到設定的收件人時用它當預設目標。
+    line_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",

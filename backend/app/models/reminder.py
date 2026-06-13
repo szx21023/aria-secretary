@@ -17,3 +17,5 @@ class Reminder(UUIDMixin, TimestampMixin, Base):
     recurrence: Mapped[str | None] = mapped_column(String(100), nullable=True)
     kind: Mapped[ReminderKind] = mapped_column(SAEnum(ReminderKind), default=ReminderKind.meeting)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # 已推播的時間戳；非 None 代表排程器不再重推此則（週期性提醒是否重排的政策在 notifier，不綁這欄）。
+    fired_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

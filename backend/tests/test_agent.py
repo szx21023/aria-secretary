@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.ai import agent
-from app.ai.agent import MAX_TOOL_ROUNDS, stream_chat
+from app.ai.agent import MAX_TOOL_ROUNDS, run_chat, stream_chat
 from app.ai.executor import ToolResult
 
 pytestmark = pytest.mark.asyncio
@@ -305,6 +305,23 @@ async def test_round_cap_returns_retry_message(monkeypatch):
     assert len(fake.sent_messages) == MAX_TOOL_ROUNDS  # 沒有超打
     assert events[-1]["type"] == "done"
     assert "換個方式再問" in events[-1]["text"]
+
+
+async def test_run_chat_returns_final_text_only(monkeypatch):
+    # 非串流入口：drain stream_chat 後只回最終文字（LINE 等不能逐字串流的通道用）
+    fake = _FakeClient([
+        ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
+        (["好，", "加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
+    ])
+    monkeypatch.setattr(agent, "get_client", lambda: fake)
+
+    async def rt(db, name, args):
+        return ToolResult("已加入待辦：回信。", changed="tasks")
+
+    monkeypatch.setattr(agent, "run_tool", rt)
+
+    text = await run_chat(_FakeDB(), [], "幫我記得回信")
+    assert text == "好，加進待辦了"
 
 
 async def test_history_is_passed_through(monkeypatch):
