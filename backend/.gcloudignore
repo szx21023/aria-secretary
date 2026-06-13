@@ -1,0 +1,7 @@
+# 不要上傳到 Cloud Build 的東西
+.env
+*.db
+**/__pycache__/
+*.egg-info/
+.venv/
+tests/
