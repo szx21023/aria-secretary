@@ -1,11 +1,16 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# backend/ 目錄（alembic/ 與 alembic.ini 所在）；用絕對路徑，才不依賴啟動時的 cwd。
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 settings = get_settings()
 
@@ -28,32 +33,26 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-# 後來加上的欄位 → SQLite ALTER 子句。create_all 只建缺的「表」，不會替既有表補「欄位」，
-# 所以舊 aria.db 升級時要靠這裡逐欄補上。schema 穩定後改 Alembic 一次取代這段。
-_ADDED_COLUMNS: dict[str, dict[str, str]] = {
-    "conversations": {"line_user_id": "VARCHAR(64)"},
-    "reminders": {"fired_at": "DATETIME"},
-    "events": {"notified_at": "DATETIME"},
-}
+def _alembic_config():
+    """以絕對路徑指向 alembic/，sqlalchemy.url 由 env.py 從 settings 取得。"""
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    return cfg
 
 
-async def _add_missing_columns(conn) -> None:
-    """對既有 SQLite 庫補上 _ADDED_COLUMNS 裡缺的欄位（皆 nullable，免回填）。"""
-    for table, columns in _ADDED_COLUMNS.items():
-        rows = await conn.exec_driver_sql(f"PRAGMA table_info({table})")
-        existing = {r[1] for r in rows.fetchall()}
-        for col, ddl_type in columns.items():
-            if col not in existing:
-                await conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl_type}")
-                logger.info("migration: %s.%s 已補上", table, col)
+def _upgrade_to_head() -> None:
+    from alembic import command
+
+    command.upgrade(_alembic_config(), "head")
 
 
 async def init_db() -> None:
-    """建立資料表。M0 用 create_all；schema 穩定後改 Alembic。"""
-    # 確保所有 model 都被 import 進 metadata
-    from app import models  # noqa: F401
-    from app.models.base import Base
+    """套用 Alembic migration 到最新版（含建表）。
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await _add_missing_columns(conn)
+    Alembic 走同步，包進 to_thread 不卡事件迴圈。schema 變更一律新增 migration，
+    不再手刻 ALTER（取代了舊的 _add_missing_columns）。
+    注意：測試各自用 Base.metadata.create_all 建表，不經過這裡。
+    """
+    await asyncio.to_thread(_upgrade_to_head)
