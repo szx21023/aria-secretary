@@ -15,3 +15,6 @@ frontend/.playwright-mcp/
 # misc
 .DS_Store
 .playwright-mcp/
+
+# Claude local (個人設定,含帳號等敏感資訊,不進 repo)
+CLAUDE.local.md
