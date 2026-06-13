@@ -87,6 +87,7 @@ async def process_due(db: AsyncSession, now: datetime | None = None) -> list[str
         msg = f"🔔 提醒：{r.title}" + (f"\n{r.subtitle}" if r.subtitle else "")
         if await client.push(token, target, msg):
             r.fired_at = now
+            await db.commit()  # 推成功就立刻落地，避免本輪後段出錯時把已送的標記回滾→下輪重送
             sent.append(msg)
         else:
             logger.warning("提醒「%s」推播失敗，下輪重試", r.title)
@@ -114,6 +115,7 @@ async def process_due(db: AsyncSession, now: datetime | None = None) -> list[str
         msg = f"📅 行程即將開始（約 {mins} 分鐘後）\n{when} {e.title}{loc}"
         if await client.push(token, target, msg):
             e.notified_at = now
+            await db.commit()  # 同上：推成功立刻落地
             sent.append(msg)
         else:
             logger.warning("行程「%s」推播失敗，下輪重試", e.title)

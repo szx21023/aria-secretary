@@ -42,7 +42,17 @@ LINE_SECRET=$(grep -E '^LINE_CHANNEL_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -
 LINE_TOKEN=$(grep -E '^LINE_CHANNEL_ACCESS_TOKEN=' "$ENV_FILE" | head -n1 | cut -d= -f2-)
 if [ -n "$LINE_SECRET" ] && [ -n "$LINE_TOKEN" ]; then
   ENV_VARS="${ENV_VARS}@LINE_CHANNEL_SECRET=${LINE_SECRET}@LINE_CHANNEL_ACCESS_TOKEN=${LINE_TOKEN}"
-  echo "    （偵測到 LINE 設定，一併注入）"
+  # 白名單與推播目標也要一起帶，否則部署的服務永遠是「不限制」全開狀態，
+  # README 要求的鎖定會被部署路徑悄悄繞過（安全洞）。空值代表不設定（維持全開）。
+  LINE_ALLOWED=$(grep -E '^LINE_ALLOWED_USER_IDS=' "$ENV_FILE" | head -n1 | cut -d= -f2-)
+  LINE_PUSH_ID=$(grep -E '^LINE_PUSH_USER_ID=' "$ENV_FILE" | head -n1 | cut -d= -f2-)
+  [ -n "$LINE_ALLOWED" ] && ENV_VARS="${ENV_VARS}@LINE_ALLOWED_USER_IDS=${LINE_ALLOWED}"
+  [ -n "$LINE_PUSH_ID" ] && ENV_VARS="${ENV_VARS}@LINE_PUSH_USER_ID=${LINE_PUSH_ID}"
+  if [ -n "$LINE_ALLOWED" ]; then
+    echo "    （偵測到 LINE 設定，一併注入；白名單已啟用）"
+  else
+    echo "    （偵測到 LINE 設定，一併注入；⚠️ 未設白名單＝任何人都能對話）"
+  fi
 fi
 
 "${GC[@]}" run deploy "$BACKEND_SERVICE" \
