@@ -103,6 +103,83 @@ async def test_webhook_blocks_unauthorized_user(client, monkeypatch):
     assert declined == ["rTok"]
 
 
+async def test_webhook_rejects_missing_signature_header(client, monkeypatch):
+    # 完全沒帶 X-Line-Signature（與「帶了但錯」是不同分支：Header 預設 None）→ 仍須 403。
+    monkeypatch.setattr(line, "get_settings", lambda: _fake_settings())
+    body = _text_event("嗨")
+    resp = await client.post("/api/line/webhook", content=body)  # 不帶簽章 header
+    assert resp.status_code == 403
+
+
+async def test_webhook_blocks_event_without_user_id(client, monkeypatch):
+    # 白名單非空、事件沒有 userId（source 無 userId）→ None 不在名單，必須擋下、不進對話。
+    monkeypatch.setattr(line, "get_settings", lambda: _fake_settings(allowed=["Uowner"]))
+    handled = []
+    monkeypatch.setattr(line, "_handle_text", lambda *a: handled.append(a))
+
+    async def fake_decline(token, reply_token):
+        pass
+
+    monkeypatch.setattr(line, "_decline", fake_decline)
+
+    import json
+
+    body = json.dumps(
+        {
+            "events": [
+                {
+                    "type": "message",
+                    "replyToken": "rTok",
+                    "source": {"type": "user"},  # 無 userId → user_id=None
+                    "message": {"type": "text", "text": "今天有什麼行程"},
+                }
+            ]
+        }
+    ).encode()
+    resp = await client.post("/api/line/webhook", content=body, headers={"X-Line-Signature": _sign(body)})
+
+    assert resp.status_code == 200
+    assert handled == []  # 匿名/無 userId 事件不得讀到主人資料
+
+
+async def test_webhook_multi_event_batch_routes_each(client, monkeypatch):
+    # LINE 會一次送多個事件：授權者進對話、名單外者被婉拒，兩者各自處理（非整批一刀切）。
+    monkeypatch.setattr(line, "get_settings", lambda: _fake_settings(allowed=["Uowner"]))
+    handled, declined = [], []
+    monkeypatch.setattr(line, "_handle_text", lambda *a: handled.append(a))
+
+    async def fake_decline(token, reply_token):
+        declined.append(reply_token)
+
+    monkeypatch.setattr(line, "_decline", fake_decline)
+
+    import json
+
+    body = json.dumps(
+        {
+            "events": [
+                {
+                    "type": "message",
+                    "replyToken": "rOwner",
+                    "source": {"type": "user", "userId": "Uowner"},
+                    "message": {"type": "text", "text": "我的待辦"},
+                },
+                {
+                    "type": "message",
+                    "replyToken": "rStranger",
+                    "source": {"type": "user", "userId": "Ustranger"},
+                    "message": {"type": "text", "text": "偷看別人行程"},
+                },
+            ]
+        }
+    ).encode()
+    resp = await client.post("/api/line/webhook", content=body, headers={"X-Line-Signature": _sign(body)})
+
+    assert resp.status_code == 200
+    assert handled == [("我的待辦", "rOwner", "Uowner")]  # 只有授權者進對話
+    assert declined == ["rStranger"]  # 名單外者被婉拒
+
+
 async def test_webhook_allows_listed_user(client, monkeypatch):
     monkeypatch.setattr(line, "get_settings", lambda: _fake_settings(allowed=["Uowner"]))
     handled = []

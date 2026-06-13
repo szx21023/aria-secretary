@@ -127,6 +127,8 @@ async def test_event_in_lead_window_pushed(db, _patch):
 
     assert len(sent) == 1
     assert "設計週會" in _patch[0][1]
+    # 時區轉換要落地：12:05 UTC → Asia/Taipei 20:05（少了 .astimezone 會是 12:05，差 8 小時）。
+    assert "20:05" in _patch[0][1]
     await db.refresh(e)
     assert e.notified_at == _NOW
 
