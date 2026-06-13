@@ -18,3 +18,9 @@ frontend/.playwright-mcp/
 
 # Claude local (個人設定,含帳號等敏感資訊,不進 repo)
 CLAUDE.local.md
+
+# 部署設定(含真實專案 ID / 帳號,不進 repo)
+deploy.env
+
+# 由 deploy.sh 自動產生,含 backend 網址,不進 repo
+frontend/.env.production

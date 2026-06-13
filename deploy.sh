@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+#
+# 把 aria-secretary 的 backend + frontend 部署到 GCP Cloud Run。
+# 可重複執行（idempotent）：每次跑都會 build 新映像並滾動更新。
+#
+# 用法：
+#   1. cp deploy.env.example deploy.env  並填入你的 GCP 專案 / 帳號
+#   2. 確認 backend/.env 內有 ANTHROPIC_API_KEY
+#   3. ./deploy.sh
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 設定來源：deploy.env（gitignore）優先，其次環境變數
+[ -f "$SCRIPT_DIR/deploy.env" ] && source "$SCRIPT_DIR/deploy.env"
+
+PROJECT="${GCP_PROJECT:?請在 deploy.env 設定 GCP_PROJECT}"
+ACCOUNT="${GCP_ACCOUNT:?請在 deploy.env 設定 GCP_ACCOUNT}"
+REGION="${GCP_REGION:-asia-east1}"
+BACKEND_SERVICE="${BACKEND_SERVICE:-aria-backend}"
+FRONTEND_SERVICE="${FRONTEND_SERVICE:-aria-frontend}"
+
+GC=(gcloud --project="$PROJECT" --account="$ACCOUNT")
+
+echo "==> [1/5] 開通必要 API"
+"${GC[@]}" services enable \
+  run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+
+echo "==> [2/5] 部署 backend（CORS 先放寬，稍後收斂）"
+# 注意：KEY=$(...) 這種賦值即使命令替換失敗，set -e 也不會中止，故需顯式檢查。
+ENV_FILE="$SCRIPT_DIR/backend/.env"
+[ -f "$ENV_FILE" ] || { echo "ERROR: 找不到 $ENV_FILE，無法取得 ANTHROPIC_API_KEY" >&2; exit 1; }
+KEY=$(grep -E '^ANTHROPIC_API_KEY=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "\"'")
+[ -n "$KEY" ] || { echo "ERROR: $ENV_FILE 內沒有非空的 ANTHROPIC_API_KEY" >&2; exit 1; }
+"${GC[@]}" run deploy "$BACKEND_SERVICE" \
+  --source backend \
+  --region "$REGION" \
+  --platform managed \
+  --allow-unauthenticated \
+  --set-env-vars "DATABASE_URL=sqlite+aiosqlite:////tmp/aria.db,APP_TZ=Asia/Taipei,CORS_ORIGINS=*,ANTHROPIC_API_KEY=${KEY}"
+
+BACKEND_URL=$("${GC[@]}" run services describe "$BACKEND_SERVICE" \
+  --region "$REGION" --format='value(status.url)') \
+  || { echo "ERROR: 取得 $BACKEND_SERVICE URL 失敗" >&2; exit 1; }
+[ -n "$BACKEND_URL" ] || { echo "ERROR: $BACKEND_SERVICE URL 為空，後端可能未就緒" >&2; exit 1; }
+echo "    backend URL = $BACKEND_URL"
+
+echo "==> [3/5] 寫入 frontend/.env.production（指向 backend）"
+echo "VITE_API_BASE=$BACKEND_URL" > "$SCRIPT_DIR/frontend/.env.production"
+
+echo "==> [4/5] 部署 frontend"
+"${GC[@]}" run deploy "$FRONTEND_SERVICE" \
+  --source frontend \
+  --region "$REGION" \
+  --platform managed \
+  --allow-unauthenticated
+
+FRONTEND_URL=$("${GC[@]}" run services describe "$FRONTEND_SERVICE" \
+  --region "$REGION" --format='value(status.url)') \
+  || { echo "ERROR: 取得 $FRONTEND_SERVICE URL 失敗" >&2; exit 1; }
+# 避免空字串讓下一步把 CORS_ORIGINS 設成 ""（反而擋掉所有來源）
+[ -n "$FRONTEND_URL" ] || { echo "ERROR: $FRONTEND_SERVICE URL 為空，無法收斂 CORS" >&2; exit 1; }
+echo "    frontend URL = $FRONTEND_URL"
+
+echo "==> [5/5] 收斂 backend CORS_ORIGINS 為 frontend 網址"
+"${GC[@]}" run services update "$BACKEND_SERVICE" \
+  --region "$REGION" \
+  --update-env-vars "CORS_ORIGINS=$FRONTEND_URL"
+
+echo
+echo "✅ 完成"
+echo "   frontend : $FRONTEND_URL"
+echo "   backend  : $BACKEND_URL"

@@ -1,0 +1,5 @@
+# 不要上傳到 Cloud Build
+node_modules/
+dist/
+.playwright-mcp/
+*.tsbuildinfo
