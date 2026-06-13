@@ -26,6 +26,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/line", tags=["line"])
 
 _FALLBACK_REPLY = "抱歉，我這邊出了點狀況，沒能處理你的訊息，等一下再試一次好嗎？"
+_UNAUTHORIZED_REPLY = "抱歉，這個秘書只服務它的主人，沒辦法回應你的訊息。"
+
+
+def _authorized(settings, user_id: str | None) -> bool:
+    """白名單為空＝不限制；非空則 user_id 必須在名單內。
+
+    沒驗哪個 LINE 使用者就放行，會讓任何加到 bot 的人都讀得到主人的行程與對話歷史，
+    所以授權檢查擋在進對話之前——簽章只證明「訊息來自 LINE」，不代表「來自主人」。
+    """
+    allowed = settings.line_allowed_user_id_list
+    if not allowed:
+        return True
+    return user_id in allowed
 
 
 @router.post("/webhook")
@@ -52,10 +65,20 @@ async def webhook(
         reply_token = event.get("replyToken")
         user_id = event.get("source", {}).get("userId")
         text = event["message"]["text"]
+        # 授權擋在最前面：未授權者不進對話，記下 userId（方便主人把自己加進白名單）並婉拒。
+        if not _authorized(settings, user_id):
+            logger.warning("LINE 訊息來自未授權 user=%s，已忽略", user_id)
+            if reply_token:
+                background.add_task(_decline, settings.line_channel_access_token, reply_token)
+            continue
         # 背景處理：AI 可能跑數秒，不能卡住 webhook 回應（否則 LINE 逾時重送 → 重複回覆）。
         background.add_task(_handle_text, text, reply_token, user_id)
 
     return {"status": "ok"}
+
+
+async def _decline(token: str, reply_token: str) -> None:
+    await client.reply(token, reply_token, _UNAUTHORIZED_REPLY)
 
 
 async def _handle_text(text: str, reply_token: str | None, user_id: str | None) -> None:
@@ -79,6 +102,8 @@ async def _handle_text(text: str, reply_token: str | None, user_id: str | None) 
                 add_assistant_message(db, convo.id, reply_text)
                 await db.commit()
             else:
+                # 模型整輪沒吐字（非例外，例如只呼叫工具就收尾）。留 log 區分於真失敗，仍給 fallback。
+                logger.warning("LINE 對話模型回覆為空，改送 fallback")
                 reply_text = _FALLBACK_REPLY
 
         await _send(token, reply_token, user_id, reply_text)
@@ -92,5 +117,7 @@ async def _send(token: str, reply_token: str | None, user_id: str | None, text: 
     """優先用 reply token（免費、不限量）；失敗（逾時/用過）再 fallback push。"""
     if reply_token and await client.reply(token, reply_token, text):
         return
-    if user_id:
-        await client.push(token, user_id, text)
+    if user_id and await client.push(token, user_id, text):
+        return
+    # 兩條路都送不出去（reply 失敗且沒有可 push 的對象）：明確記一筆，否則訊息靜默蒸發。
+    logger.warning("LINE 訊息無法送達（reply 失敗、無 push 對象）")

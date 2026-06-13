@@ -154,6 +154,50 @@ async def test_already_started_event_marked_not_pushed(db, _patch):
     assert e.notified_at == _NOW  # 但標記，免重判
 
 
+async def test_due_reminder_not_marked_when_push_fails(db, monkeypatch):
+    # 關鍵迴歸：到點提醒推播失敗時「不可」標記 fired_at，否則會被永久靜默丟掉；下輪要能重試。
+    monkeypatch.setattr(notifier, "get_settings", lambda: _settings())
+
+    async def failing_push(token, user_id, text):
+        return False  # LINE 暫時性失敗
+
+    monkeypatch.setattr(notifier.client, "push", failing_push)
+
+    await _convo_with_line(db)
+    r = Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), enabled=True)
+    db.add(r)
+    await db.commit()
+
+    sent = await notifier.process_due(db, now=_NOW)
+
+    assert sent == []
+    await db.refresh(r)
+    assert r.fired_at is None  # 未標記 → 下輪會重試
+
+
+async def test_due_event_not_marked_when_push_fails(db, monkeypatch):
+    monkeypatch.setattr(notifier, "get_settings", lambda: _settings())
+
+    async def failing_push(token, user_id, text):
+        return False
+
+    monkeypatch.setattr(notifier.client, "push", failing_push)
+
+    await _convo_with_line(db)
+    e = Event(
+        title="設計週會",
+        start_at=_NOW + timedelta(minutes=5),
+        end_at=_NOW + timedelta(minutes=35),
+    )
+    db.add(e)
+    await db.commit()
+
+    await notifier.process_due(db, now=_NOW)
+
+    await db.refresh(e)
+    assert e.notified_at is None  # 即將開始但推播失敗 → 不標記，下輪重試
+
+
 async def test_uses_configured_push_user_over_conversation(db, monkeypatch, _patch):
     # 設定釘死收件人時，優先於 conversation 捕捉到的 user
     monkeypatch.setattr(notifier, "get_settings", lambda: _settings(push_user_id="Ufixed"))

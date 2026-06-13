@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # 推播目標。留空則用「最後一個跟 bot 講過話的人」（從 webhook 捕捉，存在 Conversation）。
     # 想釘死特定收件人時才填。
     line_push_user_id: str = ""
+    # 對話授權白名單（逗號分隔的 LINE userId）。留空＝不限制（任何加到 bot 的人都能對話、
+    # 並讀到主人的行程／歷史，啟動時會記一筆警告）；填了就只有名單內的人能用，其餘忽略並婉拒。
+    line_allowed_user_ids: str = ""
 
     # ── 推播排程 ──────────────────────────────────────────────
     # 行程「即將開始」提前幾分鐘推；提醒則在 trigger_at 當下推。
@@ -35,6 +38,10 @@ class Settings(BaseSettings):
     def line_enabled(self) -> bool:
         """secret 與 access token 都備齊才算啟用 LINE。"""
         return bool(self.line_channel_secret and self.line_channel_access_token)
+
+    @property
+    def line_allowed_user_id_list(self) -> list[str]:
+        return [u.strip() for u in self.line_allowed_user_ids.split(",") if u.strip()]
 
 
 @lru_cache

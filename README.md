@@ -15,7 +15,7 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 **＋ LINE 串接** — Messaging API webhook 讓你在 LINE 上直接跟秘書對話（與網頁共用同一段記憶），
 背景排程器在提醒到點／行程即將開始時主動推播到 LINE。詳見下方「LINE 串接」。
-測試：後端 137 passed、前端 12 passed。
+測試：後端 149 passed、前端 12 passed。
 
 里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅ → LINE 串接 ✅
 （下一步：M6 可選 — 多使用者 + auth、Docker、部署、週期性提醒重排）
@@ -57,6 +57,8 @@ npm run dev
    LINE_CHANNEL_ACCESS_TOKEN=...
    # 可選：釘死推播收件人；留空＝自動用最後跟 bot 講話的人
    LINE_PUSH_USER_ID=
+   # 對話授權白名單（逗號分隔 userId）；留空＝不限制（見下方安全提醒）
+   LINE_ALLOWED_USER_IDS=
    EVENT_REMINDER_LEAD_MIN=10   # 行程提前幾分鐘推
    NOTIFIER_INTERVAL_SEC=60     # 推播掃描間隔；0 = 停用推播但保留對話
    ```
@@ -64,9 +66,14 @@ npm run dev
    **`https://<你的網域>/api/line/webhook`** 設成 channel 的 Webhook URL 並啟用。
 4. 用手機加該 channel 為好友，傳一句話即可開始。秘書的推播會送給「最後跟它講話的人」（除非設了 `LINE_PUSH_USER_ID`）。
 
+> **⚠️ 安全提醒**：webhook 簽章只能證明「訊息來自 LINE」，**不能**證明「來自你本人」。
+> 若不設 `LINE_ALLOWED_USER_IDS`，任何加到你 bot 的人都能透過秘書讀到你的行程／對話歷史，
+> 甚至把推播收件人搶過去。**請務必**先加好友、從後端 log 撈出自己的 `userId`，填進白名單鎖定。
+> 未設定時後端啟動會印警告。
+
 ### 運作
-- **對話**：webhook 驗簽 → 立刻回 200 → 背景跑同一套 Claude tool-use agent → 用 reply token 回覆（失敗 fallback push）。
-  LINE 與網頁共用同一個全域 conversation，兩邊上下文互通。
+- **對話**：webhook 驗簽 →（白名單授權檢查）→ 立刻回 200 → 背景跑同一套 Claude tool-use agent →
+  用 reply token 回覆（失敗 fallback push）。LINE 與網頁共用同一個全域 conversation，兩邊上下文互通。
 - **推播**：背景排程器每 `NOTIFIER_INTERVAL_SEC` 秒掃描，提醒 `trigger_at` 到點、行程在 lead 視窗內即 push，
   靠 `Reminder.fired_at` / `Event.notified_at` 防重複（重啟也不重推）。過期逾 10 分鐘的項目只標記不推，避免復活洗版。
 - **已知限制**：週期性提醒（`recurrence`）目前推一次後不自動重排；多人留待 M6。
