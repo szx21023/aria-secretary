@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.helpers import reject_null_fields
+from app.common.exceptions import NotFoundException
 from app.db import get_db
 from app.models.reminder import Reminder
 from app.schemas.reminder import ReminderCreate, ReminderRead, ReminderUpdate
@@ -16,7 +17,7 @@ _REQUIRED_FIELDS = frozenset({"title", "kind", "enabled"})
 async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
     reminder = await db.get(Reminder, reminder_id)
     if reminder is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="找不到該提醒")
+        raise NotFoundException("找不到該提醒")
     return reminder
 
 

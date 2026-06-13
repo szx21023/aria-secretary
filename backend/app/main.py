@@ -2,14 +2,13 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
 
 from app.api import chat, events, line, reminders, tasks
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
+from app.exception_handlers import register_exception_handlers
 from app.seed import seed_if_empty
 from app.services.conversation import get_or_create_conversation
 from app.services.notifier import run_notifier
@@ -83,14 +82,8 @@ app.include_router(reminders.router)
 app.include_router(chat.router)
 app.include_router(line.router)
 
-
-@app.exception_handler(IntegrityError)
-async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    """把 DB 約束違反轉成明確的 409，而非不透明的 500。"""
-    return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT,
-        content={"detail": "資料衝突或違反約束"},
-    )
+# 統一錯誤信封：HTTPException / 驗證錯誤 / IntegrityError / 未捕捉例外
+register_exception_handlers(app)
 
 
 @app.get("/api/health", tags=["meta"])
