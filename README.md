@@ -15,7 +15,7 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 **＋ LINE 串接** — Messaging API webhook 讓你在 LINE 上直接跟秘書對話（與網頁共用同一段記憶），
 背景排程器在提醒到點／行程即將開始時主動推播到 LINE。詳見下方「LINE 串接」。
-測試：後端 149 passed、前端 12 passed。
+測試：後端 154 passed、前端 12 passed。
 
 里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅ → LINE 串接 ✅
 （下一步：M6 可選 — 多使用者 + auth、Docker、部署、週期性提醒重排）

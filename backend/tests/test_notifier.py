@@ -3,6 +3,7 @@
 不打真 LINE：client.push 換成記錄器。用固定 now 餵入，避免依賴系統時鐘。
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -16,6 +17,16 @@ from app.services import notifier
 pytestmark = pytest.mark.asyncio
 
 _NOW = datetime(2026, 6, 13, 12, 0, tzinfo=timezone.utc)
+
+
+class _FakeSession:
+    """run_notifier 的 `async with AsyncSessionLocal() as db` 用；process_due 被 stub 掉，db 不會真被碰。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
 
 
 def _settings(push_user_id="", lead=10):
@@ -208,3 +219,41 @@ async def test_uses_configured_push_user_over_conversation(db, monkeypatch, _pat
     await notifier.process_due(db, now=_NOW)
 
     assert _patch[0][0] == "Ufixed"
+
+
+# ── run_notifier 常駐迴圈：單輪失敗不該死、CancelledError 要能傳出去 ──
+
+async def test_run_notifier_survives_tick_exception(monkeypatch):
+    # 單輪 process_due 拋例外（DB 暫時故障/LINE 5xx）→ 迴圈不死，續跑下一輪。
+    monkeypatch.setattr(notifier, "get_settings", lambda: SimpleNamespace(notifier_interval_sec=0))
+    monkeypatch.setattr(notifier, "AsyncSessionLocal", lambda: _FakeSession())
+    ticks = []
+
+    async def flaky_process_due(db):
+        ticks.append(len(ticks))
+        if len(ticks) == 1:
+            raise RuntimeError("transient DB error")  # 第一輪炸
+        raise asyncio.CancelledError  # 第二輪：證明撐過了第一次失敗，再收掉迴圈
+
+    monkeypatch.setattr(notifier, "process_due", flaky_process_due)
+
+    with pytest.raises(asyncio.CancelledError):
+        await notifier.run_notifier()
+    assert len(ticks) == 2  # 第一輪例外被吞、第二輪仍有跑到
+
+
+async def test_run_notifier_propagates_cancellation(monkeypatch):
+    # task.cancel() 時 CancelledError 必須傳出去（不被 broad except 吞掉），否則 lifespan 關不掉。
+    monkeypatch.setattr(notifier, "get_settings", lambda: SimpleNamespace(notifier_interval_sec=60))
+    monkeypatch.setattr(notifier, "AsyncSessionLocal", lambda: _FakeSession())
+
+    async def idle_process_due(db):
+        return []
+
+    monkeypatch.setattr(notifier, "process_due", idle_process_due)
+
+    task = asyncio.create_task(notifier.run_notifier())
+    await asyncio.sleep(0)  # 讓它跑到 await asyncio.sleep(60) 停住
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task

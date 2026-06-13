@@ -166,6 +166,21 @@ async def test_send_falls_back_to_push_when_reply_fails(monkeypatch):
     assert sent["push"] == [("U1", "回覆")]
 
 
+async def test_decline_sends_unauthorized_reply(monkeypatch):
+    # _decline 的本體（webhook 測試把它 stub 掉了）：用 reply 送婉拒訊息，
+    # 且參數順序為 (token, reply_token, text)——順序錯了所有 webhook 測試照樣綠，所以在這裡釘死。
+    sent = []
+
+    async def fake_reply(token, reply_token, text):
+        sent.append((token, reply_token, text))
+        return True
+
+    monkeypatch.setattr(line.client, "reply", fake_reply)
+
+    await line._decline("tok", "rTok")
+    assert sent == [("tok", "rTok", line._UNAUTHORIZED_REPLY)]
+
+
 # ── _handle_text 背景處理：用 in-memory DB 取代獨立 session ─────────
 
 @pytest_asyncio.fixture
