@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.api.chat import _load_history
 from app.models.chat import Conversation, Message
+from app.services.conversation import load_history as _load_history
 from app.models.enums import MessageRole
 
 pytestmark = pytest.mark.asyncio

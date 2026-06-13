@@ -23,3 +23,5 @@ class Event(UUIDMixin, TimestampMixin, Base):
         SAEnum(EventStatus), default=EventStatus.scheduled
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 「即將開始」推播已送出的時間戳；非 None 代表已推過，排程器不再重推。
+    notified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

@@ -283,9 +283,14 @@ aria-secretary/
 4. **M3 — AI 對話（讀）**：`/api/chat` streaming + system prompt + `get_schedule`/`find_free_slots`（唯讀工具）+ AIRail。
 5. **M4 — AI 對話（寫）**：加 create/reschedule/cancel/add_task/toggle 工具 + 衝突偵測 + `state_changed` 即時刷新。
 6. **M5 — 打磨** ✅：對話歷史持久化（DB 落地 + `GET /api/chat/history`，含串流中斷的部分回覆復原）、錯誤處理（後端串流 try/except + 復原存檔；前端 retry/連線失敗訊息）、loading/empty state、EventDetail「請秘書改期」接上對話、設定面板（色彩主題 + 光暈強度，localStorage 持久化 + vitest）。
-7. **M6（可選）**：多使用者 + auth、Docker、部署、提醒實際觸發（背景排程）、多對話 thread（目前為單一全域 conversation）。
+7. **LINE 串接** ✅（後續加入）：Messaging API webhook 讓使用者在 LINE 上跟秘書對話（複用同一套 Claude tool-use agent，
+   `agent.run_chat` 非串流入口；與網頁共用同一全域 conversation），加背景排程器（`services/notifier`）在提醒到點／行程即將開始時
+   主動 push 到 LINE。`Reminder.fired_at` / `Event.notified_at` 防重複；`Conversation.line_user_id` 記推播收件人。
+   程式碼在 `app/line/`（簽章驗證 + API client）與 `app/api/line.py`（webhook）。
+8. **M6（可選）**：多使用者 + auth、Docker、部署、週期性提醒自動重排（目前推一次）、多對話 thread（目前為單一全域 conversation）。
 
 > 行事曆三視圖（日／週／月）已於後續補上（`views/calendar/` 的 `TimeGrid`＝日/週共用、`MonthGrid`＝月）。
+> M6 的「提醒實際觸發」已隨 LINE 串接一併落地（背景排程 push）；剩餘 M6 項目仍為可選。
 
 ### 行事曆已知待修（PR review 後盤點，刻意未塞進三視圖 PR）
 - [x] **跨午夜／跨日行程渲染** — 已修：`lib/format` 新增 `daySegment()`（事件在某日 00:00–24:00 的可見區段），`TimeGrid` 改用它過濾＋clamp 高度、`MonthGrid` 改用它過濾，跨日行程每個重疊日各畫一段。

@@ -105,3 +105,20 @@ async def stream_chat(
         # 連一個字都沒生出來 → 別吐空泡泡，給可重試的提示
         text = "這次的查詢有點複雜，我沒能整理出完整回覆，可以換個方式再問一次嗎？"
     yield {"type": "done", "text": text}
+
+
+async def run_chat(db: AsyncSession, history: list[dict], user_text: str) -> str:
+    """非串流入口：跑完整 agentic loop，只回最終文字。
+
+    LINE 之類無法逐字串流的通道用它。內部 drain stream_chat，維持 agentic loop 單一來源——
+    工具執行、衝突偵測、輪數上限與錯誤復原全部沿用，不另寫一套。
+    """
+    final_text = ""
+    async for ev in stream_chat(db, history, user_text):
+        if ev["type"] == "done":
+            final_text = ev["text"]
+        elif ev["type"] == "error":
+            # stream_chat 自身不發 error（它的工具失敗是 is_error tool_result，會續跑）；
+            # 這條是防呆——真有 error frame 就讓呼叫端知道，而非把空字串當成功回覆。
+            raise RuntimeError(ev["message"])
+    return final_text

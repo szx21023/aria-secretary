@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -6,10 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api import chat, events, reminders, tasks
+from app.api import chat, events, line, reminders, tasks
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
 from app.seed import seed_if_empty
+from app.services.notifier import run_notifier
 
 settings = get_settings()
 
@@ -36,7 +38,20 @@ async def lifespan(app: FastAPI):
     await init_db()
     async with AsyncSessionLocal() as db:
         await seed_if_empty(db)
+
+    # LINE 啟用且推播未停用時，背景常駐排程器負責提醒/行程到點推播。
+    notifier_task = None
+    if settings.line_enabled and settings.notifier_interval_sec > 0:
+        notifier_task = asyncio.create_task(run_notifier())
+
     yield
+
+    if notifier_task is not None:
+        notifier_task.cancel()
+        try:
+            await notifier_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Aria · 私人秘書 API", version="0.1.0", lifespan=lifespan)
@@ -53,6 +68,7 @@ app.include_router(events.router)
 app.include_router(tasks.router)
 app.include_router(reminders.router)
 app.include_router(chat.router)
+app.include_router(line.router)
 
 
 @app.exception_handler(IntegrityError)
