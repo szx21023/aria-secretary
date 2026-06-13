@@ -1,8 +1,10 @@
-"""統一錯誤 envelope handlers — 同一個 trace_id 串起 client 回應與 server log，
-client 拿到的 traceId 一定 grep 得回完整 traceback。
+"""統一錯誤 envelope handlers — 同一個 trace_id 串起 client 回應與 server log。
 
 所有錯誤回應統一成：
     {"error": {"code", "message", "traceId", "details"}}
+
+未預期的 500 會以同一 trace_id 寫完整 traceback（log.exception），client 報的 traceId
+grep 得回；4xx 是預期內的錯誤，只記一行 context，不附 traceback。
 
 `register_exception_handlers(app)` 在 main.py 呼叫一次即可。
 """
@@ -97,11 +99,13 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(IntegrityError)
     async def integrity_exc_handler(request: Request, exc: IntegrityError):
-        """DB 約束違反 → 409，而非不透明的 500。"""
+        """DB 約束違反 → 409，而非不透明的 500。client 拿固定訊息，server 留下實際成因。"""
         trace_id = _new_trace_id()
-        log.info(
-            "IntegrityError during %s %s [trace=%s]",
-            request.method, request.url.path, trace_id,
+        # exc.orig 是底層 driver 的真正錯誤（哪個 unique/FK），只記 server、不回 client。
+        # 用 warning + exc_info：非預期的 409 多半是 bug，要能從 log 查到根因。
+        log.warning(
+            "IntegrityError during %s %s [trace=%s]: %s",
+            request.method, request.url.path, trace_id, exc.orig, exc_info=True,
         )
         return _envelope(
             code="conflict",

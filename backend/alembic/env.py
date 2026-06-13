@@ -1,7 +1,8 @@
 """Alembic 環境設定。
 
 sqlalchemy.url 一律從 app settings 取得並轉成「同步」driver（Alembic 走同步），
-所以本機/雲端只要設 DATABASE_URL 一處即可。SQLite 用 batch mode 繞過 ALTER 限制。
+所以本機/雲端只要設 DATABASE_URL 一處即可。一律開 batch mode：SQLite 的 ALTER 受限，
+batch 會建暫存表搬資料；其他方言不受影響。
 """
 
 from logging.config import fileConfig
@@ -54,7 +55,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_as_batch=True,  # SQLite ALTER 受限，batch 會建暫存表搬資料
+            render_as_batch=True,  # 一律開：SQLite ALTER 受限，其他方言無副作用
             render_item=_render_item,
         )
         with context.begin_transaction():

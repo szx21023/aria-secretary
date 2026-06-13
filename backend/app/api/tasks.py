@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.helpers import reject_null_fields
+from app.common.exceptions import NotFoundException
 from app.db import get_db
 from app.models.task import Task
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
@@ -16,7 +17,7 @@ _REQUIRED_FIELDS = frozenset({"title", "done"})
 async def _get_or_404(db: AsyncSession, task_id: str) -> Task:
     task = await db.get(Task, task_id)
     if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="找不到該待辦")
+        raise NotFoundException("找不到該待辦")
     return task
 
 

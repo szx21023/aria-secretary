@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.helpers import reject_null_fields
+from app.common.exceptions import NotFoundException
 from app.db import get_db
 from app.models.event import Event
 from app.schemas.event import EventCreate, EventRead, EventUpdate
@@ -19,7 +20,7 @@ _REQUIRED_FIELDS = frozenset({"title", "start_at", "end_at", "category", "status
 async def _get_or_404(db: AsyncSession, event_id: str) -> Event:
     event = await db.get(Event, event_id)
     if event is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="找不到該行程")
+        raise NotFoundException("找不到該行程")
     return event
 
 
