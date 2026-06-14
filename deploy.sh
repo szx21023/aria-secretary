@@ -85,10 +85,18 @@ FRONTEND_URL=$("${GC[@]}" run services describe "$FRONTEND_SERVICE" \
 [ -n "$FRONTEND_URL" ] || { echo "ERROR: $FRONTEND_SERVICE URL 為空，無法收斂 CORS" >&2; exit 1; }
 echo "    frontend URL = $FRONTEND_URL"
 
-echo "==> [5/5] 收斂 backend CORS_ORIGINS 為 frontend 網址"
+echo "==> [5/5] 收斂 backend CORS_ORIGINS 為 frontend 網址（含新舊兩種 run.app 格式）"
+# Cloud Run 同一服務有兩種網址：舊版 {svc}-{hash}-{code}.a.run.app（= status.url）
+# 與新版 {svc}-{projectNumber}.{region}.run.app。兩者 origin 不同，CORS 必須同時允許，
+# 否則使用者開新格式網址時，瀏覽器會擋掉所有 API（前端顯示「無法連線後端」）。
+PROJECT_NUMBER=$("${GC[@]}" projects describe "$PROJECT" --format='value(projectNumber)') \
+  || { echo "ERROR: 取得 projectNumber 失敗，無法組出新格式 frontend 網址" >&2; exit 1; }
+[ -n "$PROJECT_NUMBER" ] || { echo "ERROR: projectNumber 為空" >&2; exit 1; }
+FRONTEND_URL_NEW="https://${FRONTEND_SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
+# 值含逗號，沿用 ^@^ 自訂分隔，避免逗號被 gcloud 當成多個環境變數的分隔
 "${GC[@]}" run services update "$BACKEND_SERVICE" \
   --region "$REGION" \
-  --update-env-vars "CORS_ORIGINS=$FRONTEND_URL"
+  --update-env-vars "^@^CORS_ORIGINS=${FRONTEND_URL},${FRONTEND_URL_NEW}"
 
 echo
 echo "✅ 完成"
