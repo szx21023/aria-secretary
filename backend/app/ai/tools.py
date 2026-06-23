@@ -70,6 +70,29 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "get_weather",
+        "description": (
+            "查詢某地點的天氣預報。當使用者問到天氣、或要規劃出遊／外出而需要看天氣時呼叫，"
+            "例如「台中週六天氣如何」「這週末適合出去玩嗎」「明天要不要帶傘」。"
+            "回傳該地點逐日預報（天氣狀況、高低溫、降雨機率）。可查未來約 16 天、過去約 3 個月內。"
+            "規劃行程時可據此建議改室內／改日期。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "地點名稱，如「台中」「東京」「墾丁」。",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "要查的日期，格式 YYYY-MM-DD。省略則回近期幾天的概覽。",
+                },
+            },
+            "required": ["location"],
+        },
+    },
+    {
         "name": "create_event",
         "description": (
             "新增一個行程／會議。當使用者要求安排、預約、加入新的行程時呼叫，"
