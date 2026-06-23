@@ -29,9 +29,15 @@ export function Login() {
         setErr("登入服務暫時無法使用，請稍後再試。");
         return;
       }
-      const { token } = (await res.json()) as { token: string };
-      setToken(token);
-    } catch {
+      const data = (await res.json()) as { token?: unknown };
+      if (typeof data.token !== "string" || !data.token) {
+        // 回應異常（缺 token / 非字串）：別讓 undefined 被存成 token 造成登入彈跳迴圈
+        setErr("登入回應異常，請稍後再試。");
+        return;
+      }
+      setToken(data.token);
+    } catch (e) {
+      console.error("登入請求失敗", e);
       setErr("連線失敗，請稍後再試。");
     } finally {
       setBusy(false);
@@ -47,10 +53,11 @@ export function Login() {
         <input
           className="auth-input"
           type="password"
-          placeholder="密碼"
+          placeholder="密碼（限英數與符號）"
           value={pw}
           autoFocus
-          onChange={(e) => setPw(e.target.value)}
+          // 密碼限可見 ASCII（0x20–0x7E）：直接濾掉中文/emoji/控制字元，後端也會再擋一次
+          onChange={(e) => setPw(e.target.value.replace(/[^\x20-\x7E]/g, ""))}
         />
         {err && <div className="auth-err">{err}</div>}
         <button className="s-btn primary auth-btn" type="submit" disabled={busy || !pw}>

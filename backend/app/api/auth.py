@@ -50,8 +50,13 @@ async def login(req: LoginRequest) -> TokenResponse:
     if not settings.app_password or not settings.auth_secret:
         logger.error("登入被呼叫但 APP_PASSWORD/AUTH_SECRET 未設定，無法簽發 token")
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "登入功能尚未設定")
+    # 密碼限 ASCII（不接受中文/emoji）。非 ASCII 一律當密碼錯誤，
+    # 同時避免 hmac.compare_digest 收到非 ASCII str 丟 TypeError → 500。
+    if not settings.app_password.isascii():
+        logger.error("APP_PASSWORD 含非 ASCII 字元，無法比對；請改用純 ASCII 密碼")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "登入功能尚未正確設定")
     # 常數時間比較，避免以回應時間差側錄密碼長度／前綴
-    if not hmac.compare_digest(req.password, settings.app_password):
+    if not req.password.isascii() or not hmac.compare_digest(req.password, settings.app_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "密碼錯誤")
     return TokenResponse(token=_issue_token(settings.auth_secret, settings.auth_token_days))
 
@@ -61,14 +66,23 @@ async def require_auth(creds: HTTPAuthorizationCredentials | None = Depends(_bea
     settings = get_settings()
     unauthorized = HTTPException(status.HTTP_401_UNAUTHORIZED, "需要登入", headers={"WWW-Authenticate": "Bearer"})
     if not settings.auth_secret:
-        # 沒有密鑰就無法驗證任何 token → 一律擋，不放行
+        # 沒有密鑰就無法驗證任何 token → 一律擋，不放行。記一筆，否則整片 401
+        # 會被誤判成「大家剛好都過期」，而非「AUTH_SECRET 掉了」這個設定問題。
+        logger.error("require_auth 被呼叫但 AUTH_SECRET 未設定，fail-closed 全擋")
         raise unauthorized
     if creds is None or creds.scheme.lower() != "bearer":
         raise unauthorized
     try:
         payload = jwt.decode(creds.credentials, settings.auth_secret, algorithms=[_ALGO])
+    except jwt.ExpiredSignatureError:
+        # 過期是常態，使用者重新登入即可
+        logger.info("token 過期，要求重新登入")
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "登入已失效，請重新登入", headers={"WWW-Authenticate": "Bearer"}
+        ) from None
     except jwt.PyJWTError:
-        # 過期、簽章不符、格式錯——對使用者都是「請重新登入」
+        # 簽章不符／格式錯——可能是換金鑰或偽造 token，比單純過期更值得注意
+        logger.warning("token 驗證失敗（簽章或格式），要求重新登入")
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "登入已失效，請重新登入", headers={"WWW-Authenticate": "Bearer"}
         ) from None

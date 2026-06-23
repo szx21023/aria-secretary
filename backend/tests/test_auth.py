@@ -107,3 +107,56 @@ async def test_line_webhook_not_behind_jwt(auth_client):
     # LINE webhook 不該被 JWT 擋（它自有簽章/白名單）；無 token 打過去不應是 401。
     resp = await ac.post("/api/line/webhook", json={})
     assert resp.status_code != 401
+
+
+# 保護掛在 main.py 的 include 點、各路由獨立——只測 tasks 不夠。
+# 逐路由證明都要 token，未來某條 include_router 漏掉 dependency 才會被測到。
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("GET", "/api/tasks"),
+        ("GET", "/api/events"),
+        ("GET", "/api/reminders"),
+        ("GET", "/api/chat/history"),
+        ("POST", "/api/chat"),
+    ],
+)
+async def test_every_protected_route_requires_token(auth_client, method, path):
+    ac, _ = auth_client
+    kwargs = {"json": {"message": "x"}} if method == "POST" else {}
+    resp = await ac.request(method, path, **kwargs)
+    assert resp.status_code == 401, f"{method} {path} 未被 require_auth 保護"
+
+
+async def test_expired_token_rejected(auth_client):
+    ac, monkeypatch = auth_client
+    # 用負天數簽一個「出生即過期」的 token，驗 exp 真的被強制
+    monkeypatch.setattr("app.api.auth.get_settings", lambda: _settings(auth_token_days=-1))
+    token = (await ac.post("/api/auth/login", json={"password": _PASSWORD})).json()["token"]  # noqa: E501
+    monkeypatch.setattr("app.api.auth.get_settings", _settings)
+    resp = await ac.get("/api/tasks", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+async def test_non_bearer_scheme_rejected(auth_client):
+    ac, _ = auth_client
+    resp = await ac.get("/api/tasks", headers={"Authorization": "Basic abc"})
+    assert resp.status_code == 401
+
+
+async def test_non_ascii_password_is_401_not_500(auth_client):
+    ac, _ = auth_client
+    # 中文密碼：必須是 401（密碼錯誤），不可因 hmac.compare_digest 丟 TypeError 變 500
+    resp = await ac.post("/api/auth/login", json={"password": "中文密碼"})  # pragma: allowlist secret
+    assert resp.status_code == 401
+
+
+async def test_non_ascii_stored_password_is_503_not_500(auth_client):
+    ac, monkeypatch = auth_client
+    # 設定端誤填非 ASCII 密碼：視為 misconfig 回 503，仍不可 500
+    monkeypatch.setattr(
+        "app.api.auth.get_settings",
+        lambda: _settings(app_password="中文密碼"),  # pragma: allowlist secret
+    )
+    resp = await ac.post("/api/auth/login", json={"password": "ascii-pw"})  # pragma: allowlist secret
+    assert resp.status_code == 503

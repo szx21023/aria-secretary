@@ -5,10 +5,12 @@ const KEY = "aria_token";
 const listeners = new Set<() => void>();
 
 export function getToken(): string | null {
-  return localStorage.getItem(KEY);
+  // 空字串視為未登入，避免送出 "Bearer "（空 token）造成登入↔登出彈跳
+  return localStorage.getItem(KEY) || null;
 }
 
 export function setToken(token: string): void {
+  if (!token) return; // 不存空值；呼叫端應已驗證 token 非空字串
   localStorage.setItem(KEY, token);
   emit();
 }

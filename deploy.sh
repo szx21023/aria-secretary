@@ -40,6 +40,10 @@ APP_PASSWORD=$(grep -E '^APP_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2- | 
 [ -n "$APP_PASSWORD" ] || { echo "ERROR: $ENV_FILE 內沒有 APP_PASSWORD（網頁登入密碼）" >&2; exit 1; }
 AUTH_SECRET=$(grep -E '^AUTH_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "\"'")
 [ -n "$AUTH_SECRET" ] || { echo "ERROR: $ENV_FILE 內沒有 AUTH_SECRET（JWT 簽章密鑰）" >&2; exit 1; }
+# 密碼限 ASCII 可見字元（中文/emoji 後端比對會出錯、前端也擋輸入）。
+if printf '%s' "$APP_PASSWORD" | LC_ALL=C grep -q '[^ -~]'; then
+  echo "ERROR: APP_PASSWORD 只能用 ASCII 可見字元（不可含中文/emoji/控制字元）" >&2; exit 1
+fi
 # 值會以 ^@^ 分隔注入；密碼含 '@' 會破壞分隔，寧可明確擋下也不要悄悄注入錯誤的值。
 case "$APP_PASSWORD" in *@*) echo "ERROR: APP_PASSWORD 不可含 '@'（與部署分隔符衝突），請改一個不含 @ 的密碼" >&2; exit 1;; esac
 
