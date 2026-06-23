@@ -75,9 +75,5 @@ async def chat(payload: ChatRequest) -> StreamingResponse:
 @router.get("/history", response_model=list[MessageRead])
 async def history(db: AsyncSession = Depends(get_db)) -> list[Message]:
     convo = await get_or_create_conversation(db)
-    rows = await db.scalars(
-        select(Message)
-        .where(Message.conversation_id == convo.id)
-        .order_by(Message.created_at)
-    )
+    rows = await db.scalars(select(Message).where(Message.conversation_id == convo.id).order_by(Message.created_at))
     return [m for m in rows if m.role in (MessageRole.user, MessageRole.assistant)]

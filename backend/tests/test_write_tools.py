@@ -6,7 +6,7 @@ allow_conflict 可覆寫、找不到/模糊/壞輸入回友善訊息而非拋例
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import get_args
 
 import pytest
@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.ai import executor
 from app.ai.executor import (
+    _TZ,
     add_task,
     cancel_event,
     complete_task,
@@ -26,7 +27,6 @@ from app.ai.executor import (
     run_tool,
     toggle_reminder,
 )
-from app.ai.executor import _TZ
 from app.models.enums import EventCategory, ReminderKind, TaskPriority
 from app.models.event import Event
 from app.models.reminder import Reminder
@@ -34,7 +34,7 @@ from app.models.task import Task
 
 pytestmark = pytest.mark.asyncio
 
-UTC = timezone.utc
+UTC = UTC
 
 
 def _local(y, m, d, hh, mm=0) -> datetime:
@@ -79,6 +79,7 @@ async def _all(db, model):
 
 
 # ── create_event ───────────────────────────────────────────────
+
 
 async def test_create_event_success(db):
     res = await create_event(db, "新會議", "2026-06-07T15:00", 60)
@@ -135,6 +136,7 @@ async def test_create_event_bad_category(db):
 
 
 # ── reschedule_event ───────────────────────────────────────────
+
 
 async def test_reschedule_by_delta_keeps_duration(db):
     ev = await _seed_event(db, "簡報", _local(2026, 6, 7, 14), _local(2026, 6, 7, 15))
@@ -205,6 +207,7 @@ async def test_reschedule_new_start_takes_precedence_over_delta(db):
 
 # ── cancel_event ───────────────────────────────────────────────
 
+
 async def test_cancel_event(db):
     ev = await _seed_event(db, "午餐", _local(2026, 6, 7, 12), _local(2026, 6, 7, 13))
     res = await cancel_event(db, ev.id)
@@ -218,6 +221,7 @@ async def test_cancel_event_not_found(db):
 
 
 # ── add_task ───────────────────────────────────────────────────
+
 
 async def test_add_task(db):
     res = await add_task(db, "回信", due_at="2026-06-07T17:00", priority="high")
@@ -233,6 +237,7 @@ async def test_add_task_bad_priority(db):
 
 
 # ── complete_task ──────────────────────────────────────────────
+
 
 async def test_complete_task(db):
     await _seed_task(db, "確認東京出差機票")
@@ -289,10 +294,9 @@ async def test_complete_task_substring_leaves_others_untouched(db):
 
 # ── create_reminder ────────────────────────────────────────────
 
+
 async def test_create_reminder(db):
-    res = await create_reminder(
-        db, "吃維他命", subtitle="早晨例行", trigger_at="2026-06-07T08:00", kind="health"
-    )
+    res = await create_reminder(db, "吃維他命", subtitle="早晨例行", trigger_at="2026-06-07T08:00", kind="health")
     assert res.changed == "reminders"
     r = (await _all(db, Reminder))[0]
     assert r.title == "吃維他命" and r.kind == ReminderKind.health and r.enabled is True
@@ -305,9 +309,7 @@ async def test_create_reminder_bad_kind(db):
 
 
 async def test_create_reminder_with_recurrence(db):
-    res = await create_reminder(
-        db, "吃藥", trigger_at="2026-06-07T23:00", recurrence="每天", kind="health"
-    )
+    res = await create_reminder(db, "吃藥", trigger_at="2026-06-07T23:00", recurrence="每天", kind="health")
     assert res.changed == "reminders"
     assert "每天" in res.text  # 回覆帶出週期
     r = (await _all(db, Reminder))[0]
@@ -315,6 +317,7 @@ async def test_create_reminder_with_recurrence(db):
 
 
 # ── toggle_reminder ────────────────────────────────────────────
+
 
 async def test_toggle_reminder_off(db):
     await _seed_reminder(db, "信用卡帳單繳費", enabled=True)
@@ -346,6 +349,7 @@ async def test_toggle_reminder_prefers_exact_title(db):
 
 # ── get_schedule 帶 id + run_tool 寫入 dispatch ────────────────
 
+
 async def test_get_schedule_includes_event_id(db, monkeypatch):
     monkeypatch.setattr(executor, "_now_local", lambda: _local(2026, 6, 7, 8))
     ev = await _seed_event(db, "會議", _local(2026, 6, 7, 10), _local(2026, 6, 7, 11))
@@ -354,9 +358,7 @@ async def test_get_schedule_includes_event_id(db, monkeypatch):
 
 
 async def test_run_tool_create_event_marks_changed(db):
-    res = await run_tool(
-        db, "create_event", {"title": "x", "start_at": "2026-06-07T15:00", "duration_min": 30}
-    )
+    res = await run_tool(db, "create_event", {"title": "x", "start_at": "2026-06-07T15:00", "duration_min": 30})
     assert res.changed == "events"
 
 
@@ -383,6 +385,7 @@ async def test_run_tool_no_noop_log_when_write_succeeds(db, caplog):
 
 
 # ── get_tasks / get_reminders（唯讀） ──────────────────────────
+
 
 async def test_get_tasks_empty(db):
     assert "沒有任何待辦" in await get_tasks(db)

@@ -7,9 +7,9 @@ batch 會建暫存表搬資料；其他方言不受影響。
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from app.config import get_settings
 from app.models import Base  # noqa: F401  — import 觸發所有 model 註冊到 metadata
 

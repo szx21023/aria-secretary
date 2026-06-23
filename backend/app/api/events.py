@@ -54,9 +54,7 @@ async def get_event(event_id: str, db: AsyncSession = Depends(get_db)) -> Event:
 
 
 @router.patch("/{event_id}", response_model=EventRead)
-async def update_event(
-    event_id: str, payload: EventUpdate, db: AsyncSession = Depends(get_db)
-) -> Event:
+async def update_event(event_id: str, payload: EventUpdate, db: AsyncSession = Depends(get_db)) -> Event:
     event = await _get_or_404(db, event_id)
     changes = payload.model_dump(exclude_unset=True)
     reject_null_fields(changes, _REQUIRED_FIELDS)
@@ -67,9 +65,7 @@ async def update_event(
     new_start = changes.get("start_at", event.start_at)
     new_end = changes.get("end_at", event.end_at)
     if not interval_ok(new_start, new_end):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=INTERVAL_ERROR
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=INTERVAL_ERROR)
 
     for field, value in changes.items():
         setattr(event, field, value)

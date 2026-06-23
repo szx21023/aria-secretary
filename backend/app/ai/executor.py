@@ -10,7 +10,7 @@ event、add/complete task、create/toggle reminder）。寫入工具成功時在
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -33,10 +33,17 @@ WORK_START = time(9, 0)
 WORK_END = time(18, 0)
 
 # 會改動資料的工具；用來判斷「呼叫了卻 changed=None」是真的 no-op（找不到/模糊/衝突/壞輸入）。
-_WRITE_TOOLS = frozenset({
-    "create_event", "reschedule_event", "cancel_event",
-    "add_task", "complete_task", "create_reminder", "toggle_reminder",
-})
+_WRITE_TOOLS = frozenset(
+    {
+        "create_event",
+        "reschedule_event",
+        "cancel_event",
+        "add_task",
+        "complete_task",
+        "create_reminder",
+        "toggle_reminder",
+    }
+)
 
 
 def _now_local() -> datetime:
@@ -51,8 +58,8 @@ def _parse_date(s: str | None) -> date:
 
 def _local_day_bounds(d: date) -> tuple[datetime, datetime]:
     """回傳該在地日期的 [00:00, 隔日00:00) 對應的 UTC datetime。"""
-    start = datetime.combine(d, time.min, tzinfo=_TZ).astimezone(timezone.utc)
-    end = datetime.combine(d + timedelta(days=1), time.min, tzinfo=_TZ).astimezone(timezone.utc)
+    start = datetime.combine(d, time.min, tzinfo=_TZ).astimezone(UTC)
+    end = datetime.combine(d + timedelta(days=1), time.min, tzinfo=_TZ).astimezone(UTC)
     return start, end
 
 
@@ -80,7 +87,7 @@ async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "
         d = _parse_date(date)
     except ValueError:
         return f"日期格式無法解析：{date!r}，請用 YYYY-MM-DD，或省略代表今天。"
-    now = _now_local().astimezone(timezone.utc)
+    now = _now_local().astimezone(UTC)
     if range == "week":
         # 該日所在週的週一～週日
         monday = d - timedelta(days=d.weekday())
@@ -100,15 +107,11 @@ async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "
         loc = f"，地點：{e.location}" if e.location else ""
         ppl = f"，{e.attendees} 人" if e.attendees else ""
         when = f"{e.start_at.astimezone(_TZ).strftime('%m/%d %H:%M')}–{_fmt(e.end_at)}"
-        lines.append(
-            f"- {when} {e.title}（{e.category.value}，{_derive_status(e, now)}{loc}{ppl}）[id={e.id}]"
-        )
+        lines.append(f"- {when} {e.title}（{e.category.value}，{_derive_status(e, now)}{loc}{ppl}）[id={e.id}]")
     return "\n".join(lines)
 
 
-async def find_free_slots_tool(
-    db: AsyncSession, date: str | None = None, min_minutes: int = 30
-) -> str:
+async def find_free_slots_tool(db: AsyncSession, date: str | None = None, min_minutes: int = 30) -> str:
     try:
         d = _parse_date(date)
     except ValueError:
@@ -116,13 +119,13 @@ async def find_free_slots_tool(
     day_start, day_end = _local_day_bounds(d)
     events = await _events_between(db, day_start, day_end)
 
-    window_start = datetime.combine(d, WORK_START, tzinfo=_TZ).astimezone(timezone.utc)
-    window_end = datetime.combine(d, WORK_END, tzinfo=_TZ).astimezone(timezone.utc)
+    window_start = datetime.combine(d, WORK_START, tzinfo=_TZ).astimezone(UTC)
+    window_end = datetime.combine(d, WORK_END, tzinfo=_TZ).astimezone(UTC)
 
     # 已經過去的時段不算空檔（避免在 15:00 還回報今天 09:00 有空）。
     # 只要「現在」已晚於工作窗開始就往後縮（整個窗都過了則由下一行守衛攔下）；
     # 查未來日期時 now 在窗前，不受影響。
-    now_utc = _now_local().astimezone(timezone.utc)
+    now_utc = _now_local().astimezone(UTC)
     if window_start < now_utc:
         window_start = now_utc
     if window_start >= window_end:
@@ -151,9 +154,7 @@ async def get_tasks(db: AsyncSession) -> str:
 
 
 async def get_reminders(db: AsyncSession) -> str:
-    rows = list(
-        await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at))
-    )
+    rows = list(await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at)))
     if not rows:
         return "目前沒有任何提醒。"
     lines = [f"提醒共 {len(rows)} 則："]
@@ -185,7 +186,7 @@ def _parse_dt(s: str) -> datetime:
     dt = datetime.fromisoformat(s)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=_TZ)
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)
 
 
 def _fmt_dt(dt: datetime) -> str:
@@ -233,12 +234,19 @@ async def create_event(
         conflicts = detect_conflicts(await _overlapping_events(db, start, end), start, end)
         if conflicts:
             return ToolResult(
-                _conflict_msg(conflicts)
-                + " 已暫不建立；若使用者確認仍要安排，帶 allow_conflict=true 再呼叫。"
+                _conflict_msg(conflicts) + " 已暫不建立；若使用者確認仍要安排，帶 allow_conflict=true 再呼叫。"
             )
 
-    db.add(Event(title=title, start_at=start, end_at=end, category=cat,
-                 location=location, attendees=attendees))
+    db.add(
+        Event(
+            title=title,
+            start_at=start,
+            end_at=end,
+            category=cat,
+            location=location,
+            attendees=attendees,
+        )
+    )
     await db.commit()
     return ToolResult(f"已新增行程：{_fmt_dt(start)}–{_fmt(end)} {title}。", changed="events")
 
@@ -268,20 +276,19 @@ async def reschedule_event(
     if not allow_conflict:
         conflicts = detect_conflicts(
             await _overlapping_events(db, new_start, new_end, event.id),
-            new_start, new_end, exclude_id=event.id,
+            new_start,
+            new_end,
+            exclude_id=event.id,
         )
         if conflicts:
             return ToolResult(
-                _conflict_msg(conflicts)
-                + " 已暫不改期；若使用者確認仍要改，帶 allow_conflict=true 再呼叫。"
+                _conflict_msg(conflicts) + " 已暫不改期；若使用者確認仍要改，帶 allow_conflict=true 再呼叫。"
             )
 
     event.start_at = new_start
     event.end_at = new_end
     await db.commit()
-    return ToolResult(
-        f"已改期：{event.title} → {_fmt_dt(new_start)}–{_fmt(new_end)}。", changed="events"
-    )
+    return ToolResult(f"已改期：{event.title} → {_fmt_dt(new_start)}–{_fmt(new_end)}。", changed="events")
 
 
 async def cancel_event(db: AsyncSession, event_id: str) -> ToolResult:
@@ -294,9 +301,7 @@ async def cancel_event(db: AsyncSession, event_id: str) -> ToolResult:
     return ToolResult(f"已取消：{label}。", changed="events")
 
 
-async def add_task(
-    db: AsyncSession, title: str, due_at: str | None = None, priority: str | None = None
-) -> ToolResult:
+async def add_task(db: AsyncSession, title: str, due_at: str | None = None, priority: str | None = None) -> ToolResult:
     due = None
     if due_at:
         try:
@@ -385,22 +390,28 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
     if name == "get_schedule":
         return ToolResult(await get_schedule(db, args.get("date"), args.get("range", "day")))
     if name == "find_free_slots":
-        return ToolResult(
-            await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30))
-        )
+        return ToolResult(await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30)))
     if name == "get_tasks":
         return ToolResult(await get_tasks(db))
     if name == "get_reminders":
         return ToolResult(await get_reminders(db))
     if name == "create_event":
         return await create_event(
-            db, args["title"], args["start_at"], args["duration_min"],
-            args.get("category"), args.get("location"), args.get("attendees"),
+            db,
+            args["title"],
+            args["start_at"],
+            args["duration_min"],
+            args.get("category"),
+            args.get("location"),
+            args.get("attendees"),
             args.get("allow_conflict", False),
         )
     if name == "reschedule_event":
         return await reschedule_event(
-            db, args["event_id"], args.get("new_start_at"), args.get("delta_min"),
+            db,
+            args["event_id"],
+            args.get("new_start_at"),
+            args.get("delta_min"),
             args.get("allow_conflict", False),
         )
     if name == "cancel_event":
@@ -411,8 +422,12 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
         return await complete_task(db, args["query"])
     if name == "create_reminder":
         return await create_reminder(
-            db, args["title"], args.get("subtitle"), args.get("trigger_at"),
-            args.get("kind"), args.get("recurrence"),
+            db,
+            args["title"],
+            args.get("subtitle"),
+            args.get("trigger_at"),
+            args.get("kind"),
+            args.get("recurrence"),
         )
     if name == "toggle_reminder":
         return await toggle_reminder(db, args["query"], args["enabled"])

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from pydantic import AfterValidator
@@ -11,8 +11,8 @@ def _ensure_utc(v: datetime) -> datetime:
     避免後續和 DB 取回的 aware 值比較時炸出 TypeError。
     """
     if v.tzinfo is None:
-        return v.replace(tzinfo=timezone.utc)
-    return v.astimezone(timezone.utc)
+        return v.replace(tzinfo=UTC)
+    return v.astimezone(UTC)
 
 
 # 用在 schema 的 datetime 欄位。Optional 欄位寫成 `UTCDatetime | None`，

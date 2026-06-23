@@ -260,12 +260,11 @@ async def test_decline_sends_unauthorized_reply(monkeypatch):
 
 # ── _handle_text 背景處理：用 in-memory DB 取代獨立 session ─────────
 
+
 @pytest_asyncio.fixture
 async def line_db(monkeypatch):
     """讓 _handle_text 的 AsyncSessionLocal 指向一個共享的 in-memory 庫。"""
-    engine = create_async_engine(
-        "sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
-    )
+    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

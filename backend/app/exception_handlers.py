@@ -63,7 +63,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         detail = exc.detail
         log.info(
             "HTTPException %s during %s %s [trace=%s]: %s",
-            exc.status_code, request.method, request.url.path, trace_id, detail,
+            exc.status_code,
+            request.method,
+            request.url.path,
+            trace_id,
+            detail,
         )
         # 結構化 detail（來自 app.common.exceptions）：原樣轉信封
         if isinstance(detail, dict) and "code" in detail:
@@ -87,7 +91,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         trace_id = _new_trace_id()
         log.info(
             "Validation error during %s %s [trace=%s]: %s",
-            request.method, request.url.path, trace_id, exc.errors(),
+            request.method,
+            request.url.path,
+            trace_id,
+            exc.errors(),
         )
         return _envelope(
             code="validation_error",
@@ -105,7 +112,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         # 用 warning + exc_info：非預期的 409 多半是 bug，要能從 log 查到根因。
         log.warning(
             "IntegrityError during %s %s [trace=%s]: %s",
-            request.method, request.url.path, trace_id, exc.orig, exc_info=True,
+            request.method,
+            request.url.path,
+            trace_id,
+            exc.orig,
+            exc_info=True,
         )
         return _envelope(
             code="conflict",
@@ -121,7 +132,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         trace_id = _new_trace_id()
         log.exception(
             "Unhandled exception during %s %s [trace=%s]: %s",
-            request.method, request.url.path, trace_id, exc,
+            request.method,
+            request.url.path,
+            trace_id,
+            exc,
         )
         return _envelope(
             code="internal_error",

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, String, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -10,7 +10,7 @@ def _uuid() -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class UTCDateTime(TypeDecorator):
@@ -28,15 +28,15 @@ class UTCDateTime(TypeDecorator):
         if value is None:
             return None
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
         if value is None:
             return None
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
 
 class Base(DeclarativeBase):

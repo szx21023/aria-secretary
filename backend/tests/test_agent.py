@@ -20,6 +20,7 @@ pytestmark = pytest.mark.asyncio
 
 # ── 假的 streaming client ───────────────────────────────────────
 
+
 def _text_block(text: str) -> SimpleNamespace:
     return SimpleNamespace(type="text", text=text)
 
@@ -101,6 +102,7 @@ async def _collect(history=None, user_text="嗨"):
 
 # ── 測試 ────────────────────────────────────────────────────────
 
+
 async def test_plain_text_response(monkeypatch):
     fake = _FakeClient([(["你好", "！"], _final("end_turn", [_text_block("你好！")]))])
     monkeypatch.setattr(agent, "get_client", lambda: fake)
@@ -114,10 +116,12 @@ async def test_plain_text_response(monkeypatch):
 
 
 async def test_single_tool_round_reinjects_result(monkeypatch):
-    fake = _FakeClient([
-        ([], _final("tool_use", [_tool_block("get_schedule", "t1", {"date": "2026-06-05"})])),
-        (["今天有 2 個行程。"], _final("end_turn", [_text_block("今天有 2 個行程。")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [_tool_block("get_schedule", "t1", {"date": "2026-06-05"})])),
+            (["今天有 2 個行程。"], _final("end_turn", [_text_block("今天有 2 個行程。")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     called = {}
@@ -152,10 +156,15 @@ async def test_single_tool_round_reinjects_result(monkeypatch):
 
 
 async def test_tool_failure_is_recoverable(monkeypatch):
-    fake = _FakeClient([
-        ([], _final("tool_use", [_tool_block("get_schedule", "t1", {})])),
-        (["抱歉剛剛查詢出了點問題。"], _final("end_turn", [_text_block("抱歉剛剛查詢出了點問題。")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [_tool_block("get_schedule", "t1", {})])),
+            (
+                ["抱歉剛剛查詢出了點問題。"],
+                _final("end_turn", [_text_block("抱歉剛剛查詢出了點問題。")]),
+            ),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def boom(db, name, args):
@@ -178,10 +187,12 @@ async def test_tool_failure_is_recoverable(monkeypatch):
 async def test_thinking_block_reinjected_verbatim(monkeypatch):
     # thinking 區塊（含簽章）必須原樣回灌到下一輪 assistant content，否則 adaptive thinking 會 400
     think = _thinking_block("讓我查一下行程", "sig-abc123")
-    fake = _FakeClient([
-        ([], _final("tool_use", [think, _tool_block("get_schedule", "t1", {})])),
-        (["好的"], _final("end_turn", [_text_block("好的")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [think, _tool_block("get_schedule", "t1", {})])),
+            (["好的"], _final("end_turn", [_text_block("好的")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def ok(db, name, args):
@@ -198,10 +209,12 @@ async def test_thinking_block_reinjected_verbatim(monkeypatch):
 
 async def test_write_tool_emits_state_changed(monkeypatch):
     # 寫入工具回傳 changed 時，agent 要在 tool 與 done 之間推 state_changed，前端才會重抓
-    fake = _FakeClient([
-        ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
-        (["好，加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
+            (["好，加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def fake_run_tool(db, name, args):
@@ -218,10 +231,12 @@ async def test_write_tool_emits_state_changed(monkeypatch):
 
 
 async def test_readonly_tool_emits_no_state_changed(monkeypatch):
-    fake = _FakeClient([
-        ([], _final("tool_use", [_tool_block("get_schedule", "t1", {})])),
-        (["今天兩個行程"], _final("end_turn", [_text_block("今天兩個行程")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [_tool_block("get_schedule", "t1", {})])),
+            (["今天兩個行程"], _final("end_turn", [_text_block("今天兩個行程")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def fake_run_tool(db, name, args):
@@ -235,13 +250,25 @@ async def test_readonly_tool_emits_no_state_changed(monkeypatch):
 
 async def test_parallel_writers_emit_state_changed_per_resource(monkeypatch):
     # 一輪多個寫入工具 → 每個改動各發一個 state_changed，resource 對、順序對
-    fake = _FakeClient([
-        ([], _final("tool_use", [
-            _tool_block("add_task", "t1", {"title": "A"}),
-            _tool_block("create_event", "t2", {"title": "B", "start_at": "2026-06-07T15:00", "duration_min": 30}),
-        ])),
-        (["都處理好了"], _final("end_turn", [_text_block("都處理好了")])),
-    ])
+    fake = _FakeClient(
+        [
+            (
+                [],
+                _final(
+                    "tool_use",
+                    [
+                        _tool_block("add_task", "t1", {"title": "A"}),
+                        _tool_block(
+                            "create_event",
+                            "t2",
+                            {"title": "B", "start_at": "2026-06-07T15:00", "duration_min": 30},
+                        ),
+                    ],
+                ),
+            ),
+            (["都處理好了"], _final("end_turn", [_text_block("都處理好了")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     resource_of = {"add_task": "tasks", "create_event": "events"}
@@ -258,13 +285,21 @@ async def test_parallel_writers_emit_state_changed_per_resource(monkeypatch):
 
 async def test_multiple_tool_calls_in_one_round(monkeypatch):
     # 單輪可能有多個 tool_use（未停用 parallel tool use）→ 必須產生等量、id 對應的 tool_result
-    fake = _FakeClient([
-        ([], _final("tool_use", [
-            _tool_block("get_schedule", "t1", {}),
-            _tool_block("find_free_slots", "t2", {}),
-        ])),
-        (["都查好了"], _final("end_turn", [_text_block("都查好了")])),
-    ])
+    fake = _FakeClient(
+        [
+            (
+                [],
+                _final(
+                    "tool_use",
+                    [
+                        _tool_block("get_schedule", "t1", {}),
+                        _tool_block("find_free_slots", "t2", {}),
+                    ],
+                ),
+            ),
+            (["都查好了"], _final("end_turn", [_text_block("都查好了")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     calls = []
@@ -288,10 +323,7 @@ async def test_multiple_tool_calls_in_one_round(monkeypatch):
 
 async def test_round_cap_returns_retry_message(monkeypatch):
     # 每一輪都回 tool_use → 永遠不收尾，應在 MAX_TOOL_ROUNDS 後給可重試提示
-    scripted = [
-        ([], _final("tool_use", [_tool_block("get_schedule", f"t{i}", {})]))
-        for i in range(MAX_TOOL_ROUNDS)
-    ]
+    scripted = [([], _final("tool_use", [_tool_block("get_schedule", f"t{i}", {})])) for i in range(MAX_TOOL_ROUNDS)]
     fake = _FakeClient(scripted)
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
@@ -309,10 +341,12 @@ async def test_round_cap_returns_retry_message(monkeypatch):
 
 async def test_run_chat_returns_final_text_only(monkeypatch):
     # 非串流入口：drain stream_chat 後只回最終文字（LINE 等不能逐字串流的通道用）
-    fake = _FakeClient([
-        ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
-        (["好，", "加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
-    ])
+    fake = _FakeClient(
+        [
+            ([], _final("tool_use", [_tool_block("add_task", "t1", {"title": "回信"})])),
+            (["好，", "加進待辦了"], _final("end_turn", [_text_block("好，加進待辦了")])),
+        ]
+    )
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
     async def rt(db, name, args):
@@ -328,7 +362,10 @@ async def test_history_is_passed_through(monkeypatch):
     fake = _FakeClient([(["好的"], _final("end_turn", [_text_block("好的")]))])
     monkeypatch.setattr(agent, "get_client", lambda: fake)
 
-    history = [{"role": "user", "content": "先前的話"}, {"role": "assistant", "content": "先前的回覆"}]
+    history = [
+        {"role": "user", "content": "先前的話"},
+        {"role": "assistant", "content": "先前的回覆"},
+    ]
     await _collect(history=history, user_text="新問題")
 
     sent = fake.sent_messages[0]

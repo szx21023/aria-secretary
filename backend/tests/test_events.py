@@ -34,9 +34,7 @@ async def test_create_and_get(client: AsyncClient):
 
 
 async def test_create_rejects_end_before_start(client: AsyncClient):
-    r = await client.post(
-        "/api/events", json=_payload(end_at="2026-06-05T02:00:00Z")
-    )
+    r = await client.post("/api/events", json=_payload(end_at="2026-06-05T02:00:00Z"))
     assert r.status_code == 422
 
 
@@ -58,9 +56,7 @@ async def test_patch_reschedule(client: AsyncClient):
 
 async def test_patch_invalid_interval(client: AsyncClient):
     created = (await client.post("/api/events", json=_payload())).json()
-    r = await client.patch(
-        f"/api/events/{created['id']}", json={"end_at": "2026-06-05T02:00:00Z"}
-    )
+    r = await client.patch(f"/api/events/{created['id']}", json={"end_at": "2026-06-05T02:00:00Z"})
     assert r.status_code == 422
 
 
@@ -75,8 +71,14 @@ async def test_get_missing_404(client: AsyncClient):
 
 
 async def test_list_filter_by_range(client: AsyncClient):
-    await client.post("/api/events", json=_payload(title="今天", start_at="2026-06-05T02:00:00Z", end_at="2026-06-05T03:00:00Z"))
-    await client.post("/api/events", json=_payload(title="明天", start_at="2026-06-06T02:00:00Z", end_at="2026-06-06T03:00:00Z"))
+    await client.post(
+        "/api/events",
+        json=_payload(title="今天", start_at="2026-06-05T02:00:00Z", end_at="2026-06-05T03:00:00Z"),
+    )
+    await client.post(
+        "/api/events",
+        json=_payload(title="明天", start_at="2026-06-06T02:00:00Z", end_at="2026-06-06T03:00:00Z"),
+    )
 
     r = await client.get("/api/events", params={"start": "2026-06-05T00:00:00Z", "end": "2026-06-06T00:00:00Z"})
     assert r.status_code == 200

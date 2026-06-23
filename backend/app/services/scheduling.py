@@ -41,11 +41,7 @@ def detect_conflicts(
     """
     if not interval_ok(start_at, end_at):
         raise ValueError(INTERVAL_ERROR)
-    hits = [
-        e
-        for e in events
-        if e.id != exclude_id and _overlaps(start_at, end_at, e.start_at, e.end_at)
-    ]
+    hits = [e for e in events if e.id != exclude_id and _overlaps(start_at, end_at, e.start_at, e.end_at)]
     return sorted(hits, key=lambda e: e.start_at)
 
 

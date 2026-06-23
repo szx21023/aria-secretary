@@ -28,11 +28,7 @@ async def load_history(db: AsyncSession, convo_id: str) -> list[dict]:
 
     Anthropic 要求 messages 第一則為 user，所以去掉開頭的 assistant（例如 seed 的問候）。
     """
-    rows = await db.scalars(
-        select(Message)
-        .where(Message.conversation_id == convo_id)
-        .order_by(Message.created_at)
-    )
+    rows = await db.scalars(select(Message).where(Message.conversation_id == convo_id).order_by(Message.created_at))
     hist = [
         {"role": m.role.value, "content": m.content}
         for m in rows

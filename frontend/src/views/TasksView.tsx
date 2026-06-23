@@ -67,7 +67,11 @@ export function TasksView({ tasks, onToggleTask, onAddTask }: Props) {
       <div className="s-scroll">
         <div className="s-task-add">
           <span className="s-check" onClick={add} style={{ cursor: "pointer" }}>
-            <Icon name="plus" strokeWidth={2.4} style={{ opacity: 1, color: "oklch(0.7 0.03 280)" }} />
+            <Icon
+              name="plus"
+              strokeWidth={2.4}
+              style={{ opacity: 1, color: "oklch(0.7 0.03 280)" }}
+            />
           </span>
           <input
             value={val}
