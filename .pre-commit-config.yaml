@@ -73,15 +73,16 @@ repos:
         name: prettier (frontend)
         entry: bash -c 'cd frontend && npm run --silent format'
         language: system
-        # 與 `prettier --write .` 實際涵蓋範圍一致(含 vite.config.ts / index.html / json)
-        files: ^frontend/.*\.(ts|tsx|css|html|json|md)$
+        # 與 `prettier --write .` 實際涵蓋範圍一致(含 vite.config.ts / index.html / eslint.config.js / json)
+        files: ^frontend/.*\.(ts|tsx|js|css|html|json|md)$
         pass_filenames: false
         require_serial: true
       - id: frontend-eslint
         name: eslint (frontend)
         entry: bash -c 'cd frontend && npm run --silent lint:fix'
         language: system
-        files: ^frontend/.*\.(ts|tsx)$
+        # 含 .js(eslint.config.js 等),與 `eslint .` 實際涵蓋範圍一致
+        files: ^frontend/.*\.(ts|tsx|js)$
         pass_filenames: false
         require_serial: true
       - id: frontend-typecheck
