@@ -23,9 +23,7 @@ async def _get_or_404(db: AsyncSession, task_id: str) -> Task:
 
 @router.get("", response_model=list[TaskRead])
 async def list_tasks(db: AsyncSession = Depends(get_db)) -> list[Task]:
-    result = await db.scalars(
-        select(Task).order_by(Task.done, Task.due_at.is_(None), Task.due_at)
-    )
+    result = await db.scalars(select(Task).order_by(Task.done, Task.due_at.is_(None), Task.due_at))
     return list(result)
 
 
@@ -44,9 +42,7 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)) -> Task:
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
-async def update_task(
-    task_id: str, payload: TaskUpdate, db: AsyncSession = Depends(get_db)
-) -> Task:
+async def update_task(task_id: str, payload: TaskUpdate, db: AsyncSession = Depends(get_db)) -> Task:
     task = await _get_or_404(db, task_id)
     changes = payload.model_dump(exclude_unset=True)
     reject_null_fields(changes, _REQUIRED_FIELDS)

@@ -29,9 +29,7 @@ def _now_context() -> str:
     return f"（目前時間：{now.strftime('%Y-%m-%d %H:%M')} 星期{week}）"
 
 
-async def stream_chat(
-    db: AsyncSession, history: list[dict], user_text: str
-) -> AsyncGenerator[ChatEvent, None]:
+async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> AsyncGenerator[ChatEvent, None]:
     """逐步 yield SSE 事件（型別見 schemas.chat.ChatEvent）。"""
     client = get_client()
     # 動態情境（現在時間）走 message 層，不污染 system，保住 prompt cache 前綴

@@ -15,7 +15,7 @@ lifespan 啟動一個 asyncio 迴圈，每 notifier_interval_sec 秒掃一次：
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -36,7 +36,7 @@ _STALE = timedelta(minutes=10)
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _fmt(dt: datetime) -> str:

@@ -4,7 +4,7 @@
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -16,7 +16,7 @@ from app.services import notifier
 
 pytestmark = pytest.mark.asyncio
 
-_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=UTC)
 
 
 class _FakeSession:
@@ -224,6 +224,7 @@ async def test_uses_configured_push_user_over_conversation(db, monkeypatch, _pat
 
 
 # ── run_notifier 常駐迴圈：單輪失敗不該死、CancelledError 要能傳出去 ──
+
 
 async def test_run_notifier_survives_tick_exception(monkeypatch):
     # 單輪 process_due 拋例外（DB 暫時故障/LINE 5xx）→ 迴圈不死，續跑下一輪。

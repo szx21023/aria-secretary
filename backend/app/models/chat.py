@@ -1,5 +1,5 @@
-from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -23,9 +23,7 @@ class Conversation(UUIDMixin, TimestampMixin, Base):
 class Message(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "messages"
 
-    conversation_id: Mapped[str] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
-    )
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     role: Mapped[MessageRole] = mapped_column(SAEnum(MessageRole))
     content: Mapped[str] = mapped_column(Text, default="")
     # 工具呼叫的原始 JSON（assistant 的 tool_use / tool 的 result），M3/M4 用

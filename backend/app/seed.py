@@ -5,13 +5,14 @@
 所有 datetime 以 app 時區（預設 Asia/Taipei）建立後存成 UTC。
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.models.chat import Conversation, Message
 from app.models.enums import (
     EventCategory,
     EventStatus,
@@ -19,7 +20,6 @@ from app.models.enums import (
     ReminderKind,
     TaskPriority,
 )
-from app.models.chat import Conversation, Message
 from app.models.event import Event
 from app.models.reminder import Reminder
 from app.models.task import Task
@@ -36,7 +36,7 @@ def _midnight_today_local() -> datetime:
 def _at(base: datetime, day_offset: int, hour: int, minute: int = 0) -> datetime:
     """以本地午夜為基準，加上日/時/分，回傳 UTC aware datetime。"""
     local = base + timedelta(days=day_offset, hours=hour, minutes=minute)
-    return local.astimezone(timezone.utc)
+    return local.astimezone(UTC)
 
 
 def _build_events(base: datetime) -> list[Event]:
@@ -45,7 +45,17 @@ def _build_events(base: datetime) -> list[Event]:
         (0, 9, 0, 30, "晨間回顧 ＋ 規劃今日", EventCategory.personal, "個人時間", None, None),
         (0, 10, 30, 60, "與設計團隊週會", EventCategory.meeting, "Google Meet", 5, None),
         (0, 12, 30, 60, "午餐 · 與 Kevin", EventCategory.meal, "青葉餐廳 · 信義區", None, None),
-        (0, 15, 0, 45, "產品 Roadmap 簡報", EventCategory.meeting, "會議室 A", 8, "已由秘書從 14:00 順延"),
+        (
+            0,
+            15,
+            0,
+            45,
+            "產品 Roadmap 簡報",
+            EventCategory.meeting,
+            "會議室 A",
+            8,
+            "已由秘書從 14:00 順延",
+        ),
         (0, 16, 30, 60, "健身 · 河濱跑步", EventCategory.personal, "大佳河濱公園", None, None),
         (0, 19, 30, 90, "晚餐預約 · 鮨処さくら", EventCategory.meal, "中山區 · 4 位", None, None),
         (-4, 11, 0, 60, "季度策略會議", EventCategory.meeting, "會議室 B", 12, None),
@@ -90,10 +100,31 @@ def _build_tasks(base: datetime) -> list[Task]:
 def _build_reminders(base: datetime) -> list[Reminder]:
     # (title, subtitle, trigger_at, recurrence, kind, enabled)
     rows = [
-        ("與設計團隊週會即將開始", "10:30 · Google Meet", _at(base, 0, 10, 15), None, ReminderKind.meeting, True),
-        ("產品 Roadmap 簡報", "15:00 · 提前 1 小時提醒", _at(base, 0, 14, 0), None, ReminderKind.meeting, True),
+        (
+            "與設計團隊週會即將開始",
+            "10:30 · Google Meet",
+            _at(base, 0, 10, 15),
+            None,
+            ReminderKind.meeting,
+            True,
+        ),
+        (
+            "產品 Roadmap 簡報",
+            "15:00 · 提前 1 小時提醒",
+            _at(base, 0, 14, 0),
+            None,
+            ReminderKind.meeting,
+            True,
+        ),
         ("媽媽生日", "記得準備禮物與蛋糕", _at(base, 2, 9, 0), None, ReminderKind.birthday, True),
-        ("信用卡帳單繳費", "本期應繳 NT$ 18,420", _at(base, 5, 9, 0), None, ReminderKind.bill, False),
+        (
+            "信用卡帳單繳費",
+            "本期應繳 NT$ 18,420",
+            _at(base, 5, 9, 0),
+            None,
+            ReminderKind.bill,
+            False,
+        ),
         ("每日服用維他命", "早晨例行", _at(base, 0, 8, 0), "daily", ReminderKind.health, True),
     ]
     return [

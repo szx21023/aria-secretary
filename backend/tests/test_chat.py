@@ -6,17 +6,17 @@ _load_history 負責把 DB 訊息轉成 Anthropic messages 格式，並滿足
 created_at 明確給遞增值，避免同次 commit 時間戳相等導致排序不穩。
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.models.chat import Conversation, Message
-from app.services.conversation import load_history as _load_history
 from app.models.enums import MessageRole
+from app.services.conversation import load_history as _load_history
 
 pytestmark = pytest.mark.asyncio
 
-_BASE = datetime(2026, 6, 5, 1, 0, tzinfo=timezone.utc)
+_BASE = datetime(2026, 6, 5, 1, 0, tzinfo=UTC)
 
 
 async def _convo(db) -> Conversation:

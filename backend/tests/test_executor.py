@@ -4,7 +4,7 @@
 事件時間一律用 executor._TZ（=設定的 app_tz）建構，避免硬編時區。
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -15,8 +15,8 @@ from app.ai.executor import (
     get_schedule,
     run_tool,
 )
-from app.models.event import Event
 from app.models.enums import EventCategory
+from app.models.event import Event
 
 pytestmark = pytest.mark.asyncio
 
@@ -32,8 +32,8 @@ def _freeze(monkeypatch, dt: datetime) -> None:
 async def _add_event(db, title, start_local, end_local, **kw) -> Event:
     ev = Event(
         title=title,
-        start_at=start_local.astimezone(timezone.utc),
-        end_at=end_local.astimezone(timezone.utc),
+        start_at=start_local.astimezone(UTC),
+        end_at=end_local.astimezone(UTC),
         category=kw.pop("category", EventCategory.meeting),
         **kw,
     )
@@ -43,6 +43,7 @@ async def _add_event(db, title, start_local, end_local, **kw) -> Event:
 
 
 # ── get_schedule ───────────────────────────────────────────────
+
 
 async def test_get_schedule_empty(db, monkeypatch):
     _freeze(monkeypatch, _local(2026, 6, 5, 11))
@@ -99,6 +100,7 @@ async def test_get_schedule_bad_date_returns_message_not_raise(db):
 
 # ── find_free_slots_tool（含 #7 過去時段裁切）─────────────────
 
+
 async def test_find_free_slots_basic_before_work(db, monkeypatch):
     _freeze(monkeypatch, _local(2026, 6, 5, 8))  # 上班前問 → 整個工作窗都算
     await _add_event(db, "會議", _local(2026, 6, 5, 10), _local(2026, 6, 5, 11))
@@ -134,6 +136,7 @@ async def test_find_free_slots_bad_date(db):
 
 
 # ── run_tool dispatch ──────────────────────────────────────────
+
 
 async def test_run_tool_routes_get_schedule(db, monkeypatch):
     _freeze(monkeypatch, _local(2026, 6, 5, 11))

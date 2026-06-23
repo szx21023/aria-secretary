@@ -80,8 +80,14 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "行程標題。"},
-                "start_at": {"type": "string", "description": "開始時間，ISO 格式如 2026-06-07T15:00。"},
-                "duration_min": {"type": "integer", "description": "持續時間（分鐘），需為正整數。"},
+                "start_at": {
+                    "type": "string",
+                    "description": "開始時間，ISO 格式如 2026-06-07T15:00。",
+                },
+                "duration_min": {
+                    "type": "integer",
+                    "description": "持續時間（分鐘），需為正整數。",
+                },
                 "category": {
                     "type": "string",
                     "enum": ["meeting", "focus", "meal", "personal"],
@@ -109,9 +115,18 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "event_id": {"type": "string", "description": "目標行程 id（來自 get_schedule 的 [id=...]）。"},
-                "new_start_at": {"type": "string", "description": "新開始時間，ISO 格式（絕對時間）。"},
-                "delta_min": {"type": "integer", "description": "相對位移分鐘，正數延後、負數提前。"},
+                "event_id": {
+                    "type": "string",
+                    "description": "目標行程 id（來自 get_schedule 的 [id=...]）。",
+                },
+                "new_start_at": {
+                    "type": "string",
+                    "description": "新開始時間，ISO 格式（絕對時間）。",
+                },
+                "delta_min": {
+                    "type": "integer",
+                    "description": "相對位移分鐘，正數延後、負數提前。",
+                },
                 "allow_conflict": {
                     "type": "boolean",
                     "description": "是否允許衝突。預設 false。",
@@ -123,8 +138,7 @@ TOOLS = [
     {
         "name": "cancel_event",
         "description": (
-            "取消／刪除一個行程。先用 get_schedule 取得 id 再帶 event_id。"
-            "例如「取消明天的午餐」「把那個會議刪掉」。"
+            "取消／刪除一個行程。先用 get_schedule 取得 id 再帶 event_id。例如「取消明天的午餐」「把那個會議刪掉」。"
         ),
         "input_schema": {
             "type": "object",

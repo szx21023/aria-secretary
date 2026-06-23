@@ -23,16 +23,12 @@ async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
 
 @router.get("", response_model=list[ReminderRead])
 async def list_reminders(db: AsyncSession = Depends(get_db)) -> list[Reminder]:
-    result = await db.scalars(
-        select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at)
-    )
+    result = await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at))
     return list(result)
 
 
 @router.post("", response_model=ReminderRead, status_code=status.HTTP_201_CREATED)
-async def create_reminder(
-    payload: ReminderCreate, db: AsyncSession = Depends(get_db)
-) -> Reminder:
+async def create_reminder(payload: ReminderCreate, db: AsyncSession = Depends(get_db)) -> Reminder:
     reminder = Reminder(**payload.model_dump())
     db.add(reminder)
     await db.commit()
@@ -46,9 +42,7 @@ async def get_reminder(reminder_id: str, db: AsyncSession = Depends(get_db)) -> 
 
 
 @router.patch("/{reminder_id}", response_model=ReminderRead)
-async def update_reminder(
-    reminder_id: str, payload: ReminderUpdate, db: AsyncSession = Depends(get_db)
-) -> Reminder:
+async def update_reminder(reminder_id: str, payload: ReminderUpdate, db: AsyncSession = Depends(get_db)) -> Reminder:
     reminder = await _get_or_404(db, reminder_id)
     changes = payload.model_dump(exclude_unset=True)
     reject_null_fields(changes, _REQUIRED_FIELDS)

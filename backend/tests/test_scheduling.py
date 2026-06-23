@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 
 from app.services.scheduling import FreeSlot, detect_conflicts, find_free_slots
 
-UTC = timezone.utc
+UTC = UTC
 
 
 def _ev(eid: str, h0: int, h1: int) -> SimpleNamespace:
