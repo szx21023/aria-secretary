@@ -2,10 +2,11 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, events, line, reminders, tasks
+from app.api import auth, chat, events, line, reminders, tasks
+from app.api.auth import require_auth
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
 from app.exception_handlers import register_exception_handlers
@@ -76,11 +77,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(events.router)
-app.include_router(tasks.router)
-app.include_router(reminders.router)
-app.include_router(chat.router)
+# 資料與對話路由一律要登入（Bearer JWT）。LINE webhook 自帶簽章＋白名單、auth/login 為公開入口。
+_protected = [Depends(require_auth)]
+app.include_router(events.router, dependencies=_protected)
+app.include_router(tasks.router, dependencies=_protected)
+app.include_router(reminders.router, dependencies=_protected)
+app.include_router(chat.router, dependencies=_protected)
 app.include_router(line.router)
+app.include_router(auth.router)
 
 # 統一錯誤信封：HTTPException / 驗證錯誤 / IntegrityError / 未捕捉例外
 register_exception_handlers(app)

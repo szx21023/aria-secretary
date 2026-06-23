@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     app_tz: str = "Asia/Taipei"
 
+    # ── 網頁登入驗證 ──────────────────────────────────────────
+    # 單人自用：一個登入密碼 + 一把 JWT 簽章密鑰，皆從環境變數注入。
+    # 任一為空則 fail closed（登入回 503、受保護路由全 401）——正式環境務必設定。
+    app_password: str = ""
+    auth_secret: str = ""
+    auth_token_days: int = 7  # 簽發 token 的有效天數
+
     # ── LINE 串接 ──────────────────────────────────────────────
     # 兩者皆有才視為啟用：缺任一就不掛 webhook、不啟動推播（純本機/網頁模式照常跑）。
     line_channel_secret: str = ""
