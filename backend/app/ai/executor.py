@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.weather import get_weather
 from app.config import get_settings
 from app.models.enums import EventCategory, ReminderKind, TaskPriority
 from app.models.event import Event
@@ -395,6 +396,8 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
         return ToolResult(await get_tasks(db))
     if name == "get_reminders":
         return ToolResult(await get_reminders(db))
+    if name == "get_weather":
+        return ToolResult(await get_weather(args["location"], args.get("date")))
     if name == "create_event":
         return await create_event(
             db,
