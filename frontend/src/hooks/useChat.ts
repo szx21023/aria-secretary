@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { authHeaders, onUnauthorized } from "../lib/auth";
+
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const RETRY_MSG = "抱歉，我剛剛沒處理好，可以再說一次嗎？";
@@ -31,8 +33,14 @@ export function useChat() {
 
   // 載入歷史對話
   useEffect(() => {
-    fetch(`${BASE}/api/chat/history`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    fetch(`${BASE}/api/chat/history`, { headers: authHeaders() })
+      .then((r) => {
+        if (r.status === 401) {
+          onUnauthorized(); // token 失效 → 登出切回登入頁
+          throw new Error("未授權");
+        }
+        return r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`));
+      })
       .then((rows: HistoryRow[]) =>
         setMessages(rows.map((m) => ({ who: m.role === "user" ? "u" : "a", text: m.content }))),
       )
@@ -72,9 +80,13 @@ export function useChat() {
       try {
         const res = await fetch(`${BASE}/api/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({ message: text }),
         });
+        if (res.status === 401) {
+          onUnauthorized(); // token 失效 → 登出切回登入頁
+          return;
+        }
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
         const reader = res.body.getReader();

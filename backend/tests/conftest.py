@@ -3,6 +3,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.api.auth import require_auth
 from app.db import get_db
 from app.main import app
 from app.models.base import Base
@@ -35,6 +36,9 @@ async def client():
                 raise
 
     app.dependency_overrides[get_db] = override_get_db
+    # 既有 API 測試不關心登入：放行 require_auth，讓它們專注驗 CRUD/對話行為。
+    # 登入本身的把關另由 test_auth.py 以未覆寫的真實 dependency 驗證。
+    app.dependency_overrides[require_auth] = lambda: "test-owner"
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

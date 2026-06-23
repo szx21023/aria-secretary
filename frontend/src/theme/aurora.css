@@ -1276,3 +1276,39 @@ body {
   padding: 60px 20px;
   font-size: 14px;
 }
+
+/* 登入頁（複用 s-pop-back / s-pop / s-btn primary 的外觀，只補 input 與錯誤字） */
+.auth-card {
+  display: flex;
+  flex-direction: column;
+}
+.auth-sub {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  color: oklch(0.72 0.03 285);
+}
+.auth-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 13px;
+  border: 1px solid oklch(1 0 0 / 0.14);
+  background: oklch(1 0 0 / 0.05);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: 0.14s;
+}
+.auth-input:focus {
+  border-color: oklch(0.74 0.15 var(--acc1));
+  background: oklch(1 0 0 / 0.08);
+}
+.auth-err {
+  margin-top: 10px;
+  font-size: 13px;
+  color: oklch(0.72 0.17 25);
+}
+.auth-btn {
+  width: 100%;
+  margin-top: 16px;
+}

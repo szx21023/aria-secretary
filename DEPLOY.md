@@ -11,7 +11,11 @@ cp deploy.env.example deploy.env   # 填入 GCP_PROJECT、GCP_ACCOUNT
 需求:
 - 已安裝 `gcloud`,且該帳號已登入(`gcloud auth login <帳號>`)
 - 目標 GCP 專案**已開通計費(billing)**
-- `backend/.env` 內有 `ANTHROPIC_API_KEY`
+- `backend/.env` 內有:
+  - `ANTHROPIC_API_KEY`
+  - `APP_PASSWORD` —— 網頁登入密碼(你自己選,**不可含 `@`**)
+  - `AUTH_SECRET` —— JWT 簽章密鑰,建議 ≥32 bytes 隨機值:
+    `python -c 'import secrets; print(secrets.token_hex(32))'`
 
 ## 部署
 
@@ -44,4 +48,7 @@ cp deploy.env.example deploy.env   # 填入 GCP_PROJECT、GCP_ACCOUNT
   正式環境請改接 **Cloud SQL (Postgres)** —— 把 `DATABASE_URL` 改成 Postgres 連線字串即可(程式已支援)。
 - **金鑰**:`ANTHROPIC_API_KEY` 目前以環境變數注入。要更安全可改用 **Secret Manager**
   (`gcloud run deploy ... --set-secrets ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`)。
-- 兩個服務皆 `--allow-unauthenticated`(公開)。
+- 兩個服務皆 `--allow-unauthenticated`(Cloud Run 層公開)。**存取控制在應用層**:
+  backend 的 `/api/*`(events/tasks/reminders/chat)需登入(Bearer JWT),前端有登入頁;
+  `/api/health` 與 `/api/auth/login` 公開;LINE webhook 走自己的簽章+白名單。
+  注意 CORS **不是**存取控制(擋不住 curl/腳本),真正的把關是 JWT。
