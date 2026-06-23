@@ -63,7 +63,9 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
               return (
                 <div
                   key={e.id}
-                  className={"s-ev" + (state === "live" ? " hot" : "") + (state === "done" ? " done" : "")}
+                  className={
+                    "s-ev" + (state === "live" ? " hot" : "") + (state === "done" ? " done" : "")
+                  }
                   onClick={() => onOpenEvent(e)}
                 >
                   <span className="s-ev-t">{fmtTime(e.start_at)}</span>
@@ -131,9 +133,7 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
                     <div className="s-mt-x">{r.title}</div>
                     <div className="s-mt-due">{r.subtitle}</div>
                   </div>
-                  {r.trigger_at && (
-                    <span className="s-mt-due acc">{fmtTime(r.trigger_at)}</span>
-                  )}
+                  {r.trigger_at && <span className="s-mt-due acc">{fmtTime(r.trigger_at)}</span>}
                 </div>
               ))}
             </div>

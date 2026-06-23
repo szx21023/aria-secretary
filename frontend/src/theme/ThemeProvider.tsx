@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 
 import {
   applyTheme,
