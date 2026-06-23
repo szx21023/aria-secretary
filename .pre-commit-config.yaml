@@ -1,20 +1,30 @@
-# 後端 pre-commit 設定 — 格式化 + lint + 安全掃描
+# pre-commit 設定 — 後端(ruff/bandit)+ 前端(prettier/eslint/tsc)+ repo-wide 安全/衛生
 # 啟用方式(每位開發者各做一次):
-#   pip install pre-commit        # 或 pip install -e "backend[dev]"
-#   pre-commit install            # 掛進 .git/hooks
+#   pip install -e "backend[dev]"   # 取得 pre-commit
+#   (cd frontend && npm install)     # 前端 hook 需要 node_modules
+#   pre-commit install               # 掛進 .git/hooks
 # 手動全跑一次:
 #   pre-commit run --all-files
 #
-# 全域只作用於 backend/(前端日後另用 eslint/prettier)。
-# 若想讓通用衛生 hook 也涵蓋整個 repo,移除下方 default 的 `files` 即可。
+# 範圍原則:
+#   - 語言無關的衛生/密鑰掃描 → repo-wide(含 deploy.* 與 frontend)
+#   - ruff / bandit            → 僅 backend/
+#   - prettier / eslint / tsc  → 僅 frontend/(呼叫該專案本機安裝的工具)
 
 default_language_version:
   python: python3
 
-files: ^backend/
+# 排除 lock/生成檔,避免衛生 hook 去動它們
+exclude: |
+  (?x)^(
+    frontend/package-lock\.json|
+    frontend/vite\.config\.(js|d\.ts)|
+    .*\.tsbuildinfo|
+    \.secrets\.baseline
+  )$
 
 repos:
-  # 通用檔案衛生(去尾端空白、檔尾換行、擋大檔/合併衝突標記、檢查 YAML/TOML)
+  # 通用檔案衛生(repo-wide)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -26,28 +36,57 @@ repos:
       - id: check-yaml
       - id: check-toml
 
-  # 1 + 2. Ruff:lint(含 import 排序、自動修正)+ format
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
-    hooks:
-      - id: ruff
-        name: ruff (lint)
-        args: [--fix]
-      - id: ruff-format
-        name: ruff (format)
-
-  # 3a. detect-secrets:擋住把 API key / token / 私鑰 commit 進 git
+  # 密鑰外洩偵測(repo-wide:涵蓋 deploy.* / frontend 等真正高風險檔案)
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
 
-  # 3b. bandit:Python 程式碼安全掃描(讀 backend/pyproject.toml 的 [tool.bandit])
+  # ---- 後端 ----
+  # Ruff:lint(含 import 排序、自動修正)+ format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.18
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        name: ruff (format)
+        files: ^backend/
+
+  # bandit:Python 程式碼安全掃描(讀 backend/pyproject.toml 的 [tool.bandit])
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.4
     hooks:
       - id: bandit
         args: [-c, backend/pyproject.toml]
         additional_dependencies: ["bandit[toml]"]
-        exclude: ^backend/tests/
+        files: ^backend/
+        exclude: ^backend/(tests|alembic)/
+
+  # ---- 前端(呼叫 frontend/node_modules 內的本機工具)----
+  - repo: local
+    hooks:
+      - id: frontend-prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && npm run --silent format'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|css)$
+        pass_filenames: false
+        require_serial: true
+      - id: frontend-eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run --silent lint:fix'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+        require_serial: true
+      - id: frontend-typecheck
+        name: tsc (frontend typecheck)
+        entry: bash -c 'cd frontend && npm run --silent typecheck'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+        require_serial: true
