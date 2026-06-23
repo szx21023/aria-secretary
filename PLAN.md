@@ -321,3 +321,29 @@ VITE_API_BASE=http://localhost:8000
 - [x] 主題設定面板要不要做（原 Tweaks）→ M5 已做（色彩主題 + 光暈強度，localStorage 持久化）。
 
 > 下一步：你確認本計畫後，我從 **M0 骨架**開始建。
+
+---
+
+## 10. 待辦 / 技術債（backlog）
+
+- [ ] **記錄 token 消耗量** — 目前 `ai/agent.py` 完全沒讀 `usage`，無法得知每次對話燒多少 token／成本。
+  做法：在 `agent.py` 的 `final = await stream.get_final_message()` 後讀 `final.usage`
+  （`input_tokens` / `output_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens`）。
+  tool-use 迴圈每輪是獨立一次呼叫、各有 usage，需**跨輪加總**才是單次對話總量。
+  最低限度先 log 一筆（順手用 Opus 4.8 費率估成本：輸入 $5、輸出 $25、快取寫 $6.25、快取讀 $0.5 / 1M）；
+  之後可考慮落 DB（掛在 `messages` 或新 usage 表）。
+  附註：目前未設任何 `cache_control`，prompt cache 沒開，`cache_read_input_tokens` 會一直是 0 —— 省錢可一併處理。
+
+- [ ] **LINE 通知排程器在 Cloud Run 上不可靠（重要）** — `services/notifier.run_notifier()` 是 in-process
+  asyncio 背景迴圈（每 60 秒掃一次），但部署的 Cloud Run 是 `minScale=0` + CPU throttling 預設開啟
+  → **沒請求時容器被關／CPU 被掐，迴圈停擺**，行程/提醒到點時若無流量喚醒就不會推播，
+  且醒來時多半已過 `_STALE`（10 分）視窗被「標記不推」直接丟掉。主動通知功能形同失效。
+  解法擇一：(a) `--min-instances=1 --no-cpu-throttling` 讓容器常駐（有常駐成本，會打破「GCP 約 $0」）；
+  (b) 拿掉 in-process 迴圈，改用 **Cloud Scheduler** 每分鐘打受保護的 `/internal/run-notifier` 端點驅動 `process_due()`（可續縮到零，較省）。
+
+- [ ] **SQLite in /tmp 導致防重複機制失效** — notifier 靠 `fired_at`/`notified_at` 落 DB 防重推，
+  但 DB 在容器 `/tmp`，重啟/擴縮即重置 → 已推項目復活後可能重推、或行程資料整個消失。
+  與上一項相關，正解是接 **Cloud SQL (Postgres)**（程式已支援，改 `DATABASE_URL` 即可）。
+
+- [ ] **LINE 密鑰改用 Secret Manager** — `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET`
+  目前以明文環境變數存在 Cloud Run（describe 即可見）。改用 `--set-secrets`（DEPLOY.md 已提）較安全。
