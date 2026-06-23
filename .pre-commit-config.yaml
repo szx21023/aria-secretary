@@ -1,0 +1,53 @@
+# 後端 pre-commit 設定 — 格式化 + lint + 安全掃描
+# 啟用方式(每位開發者各做一次):
+#   pip install pre-commit        # 或 pip install -e "backend[dev]"
+#   pre-commit install            # 掛進 .git/hooks
+# 手動全跑一次:
+#   pre-commit run --all-files
+#
+# 全域只作用於 backend/(前端日後另用 eslint/prettier)。
+# 若想讓通用衛生 hook 也涵蓋整個 repo,移除下方 default 的 `files` 即可。
+
+default_language_version:
+  python: python3
+
+files: ^backend/
+
+repos:
+  # 通用檔案衛生(去尾端空白、檔尾換行、擋大檔/合併衝突標記、檢查 YAML/TOML)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+
+  # 1 + 2. Ruff:lint(含 import 排序、自動修正)+ format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.18
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: [--fix]
+      - id: ruff-format
+        name: ruff (format)
+
+  # 3a. detect-secrets:擋住把 API key / token / 私鑰 commit 進 git
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+
+  # 3b. bandit:Python 程式碼安全掃描(讀 backend/pyproject.toml 的 [tool.bandit])
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: [-c, backend/pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^backend/tests/
