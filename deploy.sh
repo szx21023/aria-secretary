@@ -46,8 +46,8 @@ AUTH_SECRET=$(grep -E '^AUTH_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr
 if printf '%s' "$APP_PASSWORD" | LC_ALL=C grep -q '[^ -~]'; then
   echo "ERROR: APP_PASSWORD 只能用 ASCII 可見字元（不可含中文/emoji/控制字元）" >&2; exit 1
 fi
-# 值會以 ^@^ 分隔注入；密碼含 '@' 會破壞分隔，寧可明確擋下也不要悄悄注入錯誤的值。
-case "$APP_PASSWORD" in *@*) echo "ERROR: APP_PASSWORD 不可含 '@'（與部署分隔符衝突），請改一個不含 @ 的密碼" >&2; exit 1;; esac
+# 值會以 ^|^ 分隔注入；密碼含 '|' 會破壞分隔，寧可明確擋下也不要悄悄注入錯誤的值。
+case "$APP_PASSWORD" in *\|*) echo "ERROR: APP_PASSWORD 不可含 '|'（與部署分隔符衝突），請改一個不含 | 的密碼" >&2; exit 1;; esac
 
 # 資料庫連線字串：優先取 backend/.env 的 DATABASE_URL（接 Cloud SQL Postgres 時在此設定，
 # 形如 postgresql+asyncpg://USER:PASS@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE）；  # pragma: allowlist secret
@@ -55,7 +55,24 @@ case "$APP_PASSWORD" in *@*) echo "ERROR: APP_PASSWORD 不可含 '@'（與部署
 DB_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "\"'")
 DB_URL="${DB_URL:-sqlite+aiosqlite:////tmp/aria.db}"
 
-# 用 ^|^ 自訂分隔符：值含 @（Postgres URL）、+/=（LINE token）等特殊字元，pipe 不會出現在任何值中。
+# 接 Cloud SQL 時做一致性檢查：CLOUDSQL_INSTANCE 與 DATABASE_URL 各自設定，任一缺漏都會
+# 悄悄退回 /tmp SQLite（資料每次冷啟動即失），banner 卻一切正常——這裡明確擋下、fail closed。
+if [ -n "$CLOUDSQL_INSTANCE" ]; then
+  case "$DB_URL" in
+    postgresql*) ;;
+    *) echo "ERROR: 已設 CLOUDSQL_INSTANCE，但 $ENV_FILE 的 DATABASE_URL 不是 Postgres（取得：${DB_URL:-空}）；Cloud SQL 會被掛上卻永遠用不到，app 仍寫入容器內 SQLite" >&2; exit 1;;
+  esac
+  case "$DB_URL" in
+    *"$CLOUDSQL_INSTANCE"*) ;;
+    *) echo "ERROR: DATABASE_URL 的 host=/cloudsql/... 連線名稱與 CLOUDSQL_INSTANCE（$CLOUDSQL_INSTANCE）不一致" >&2; exit 1;;
+  esac
+fi
+
+# DB_URL 是 operator 提供的值（Postgres 密碼可能含任意字元）；含 '|' 會破壞下面的 ^|^ 分隔。
+case "$DB_URL" in *\|*) echo "ERROR: DATABASE_URL 不可含 '|'（與部署分隔符衝突）" >&2; exit 1;; esac
+
+# 用 ^|^ 自訂分隔符：值含 @（Postgres URL）、+/=（LINE token）等特殊字元，pipe 不會出現在任何值中
+# （APP_PASSWORD 與 DATABASE_URL 已於上方明確擋下含 '|' 的情形）。
 ENV_VARS="^|^DATABASE_URL=${DB_URL}|APP_TZ=Asia/Taipei|CORS_ORIGINS=*|ANTHROPIC_API_KEY=${KEY}|APP_PASSWORD=${APP_PASSWORD}|AUTH_SECRET=${AUTH_SECRET}"
 
 # 選填：LINE（secret 與 token 都備齊才注入；缺任一就維持純網頁模式）
@@ -119,7 +136,7 @@ PROJECT_NUMBER=$("${GC[@]}" projects describe "$PROJECT" --format='value(project
   || { echo "ERROR: 取得 projectNumber 失敗，無法組出新格式 frontend 網址" >&2; exit 1; }
 [ -n "$PROJECT_NUMBER" ] || { echo "ERROR: projectNumber 為空" >&2; exit 1; }
 FRONTEND_URL_NEW="https://${FRONTEND_SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
-# 值含逗號，沿用 ^@^ 自訂分隔，避免逗號被 gcloud 當成多個環境變數的分隔
+# 值含逗號，沿用 ^|^ 自訂分隔，避免逗號被 gcloud 當成多個環境變數的分隔
 "${GC[@]}" run services update "$BACKEND_SERVICE" \
   --region "$REGION" \
   --update-env-vars "^|^CORS_ORIGINS=${FRONTEND_URL},${FRONTEND_URL_NEW}"
