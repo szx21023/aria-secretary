@@ -44,8 +44,13 @@ cp deploy.env.example deploy.env   # 填入 GCP_PROJECT、GCP_ACCOUNT
 
 ## 注意事項
 
-- **資料不持久**:backend 用 SQLite,DB 在容器的 `/tmp`,重啟/擴縮即重置,多實例不共用。
-  正式環境請改接 **Cloud SQL (Postgres)** —— 把 `DATABASE_URL` 改成 Postgres 連線字串即可(程式已支援)。
+- **資料持久化(Cloud SQL)**:不設定時 backend 用容器 `/tmp` 的 SQLite,重啟/擴縮即重置、多實例不共用(僅適合 demo)。
+  正式環境接 **Cloud SQL (Postgres)**:
+  1. `deploy.env` 設 `CLOUDSQL_INSTANCE=PROJECT:REGION:INSTANCE`(deploy.sh 會 `--add-cloudsql-instances` 掛上)。
+  2. `backend/.env` 的 `DATABASE_URL` 改成 unix socket 形式:
+     `postgresql+asyncpg://USER:PASS@/DBNAME?host=/cloudsql/PROJECT:REGION:INSTANCE`。<!-- pragma: allowlist secret -->
+  3. 後端相依已含 `asyncpg`(app)與 `psycopg2-binary`(Alembic migration);啟動時 `init_db()` 自動 `alembic upgrade head`。
+  最便宜配置:`db-f1-micro` + 10GB HDD + 無備份 + 單一 zone,約 US$9–10/月(實例 24h 常開,不會縮到零)。
 - **金鑰**:`ANTHROPIC_API_KEY` 目前以環境變數注入。要更安全可改用 **Secret Manager**
   (`gcloud run deploy ... --set-secrets ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`)。
 - 兩個服務皆 `--allow-unauthenticated`(Cloud Run 層公開)。**存取控制在應用層**:
