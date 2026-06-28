@@ -9,6 +9,9 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "aiosqlite>=0.20",
+    # Postgres（Cloud SQL）：asyncpg 給 app 的 async engine、psycopg2-binary 給 Alembic 同步 migration
+    "asyncpg>=0.30",
+    "psycopg2-binary>=2.9",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "anthropic>=0.69",

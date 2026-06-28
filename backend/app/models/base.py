@@ -17,8 +17,12 @@ class UTCDateTime(TypeDecorator):
     """確保進出 DB 的 datetime 一律是 UTC aware。
 
     SQLite 會把 datetime 存成 naive 字串，讀回來不帶時區資訊，
-    前端就無從得知是哪個時區。這裡綁定時轉成 UTC、讀取時補上 UTC tzinfo，
+    前端就無從得知是哪個時區。這裡綁定時一律轉成 naive-UTC 存入、讀取時補上 UTC tzinfo，
     讓 API 永遠輸出帶 offset 的 ISO 字串。
+
+    底層欄位是 TIMESTAMP WITHOUT TIME ZONE（Postgres）：綁定時必須去掉 tzinfo，
+    否則 asyncpg 會拒收 aware datetime（can't bind aware value to naive column）。
+    SQLite 不檢查時區，但同樣存 naive-UTC 保持一致。
     """
 
     impl = DateTime
@@ -29,7 +33,7 @@ class UTCDateTime(TypeDecorator):
             return None
         if value.tzinfo is None:
             value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC)
+        return value.astimezone(UTC).replace(tzinfo=None)
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
         if value is None:

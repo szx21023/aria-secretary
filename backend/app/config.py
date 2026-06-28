@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./aria.db"
     cors_origins: str = "http://localhost:5173"
     app_tz: str = "Asia/Taipei"
+    # 啟動時 events 表為空是否灌入 demo 種子資料。dev 預設開（方便本機有資料可看）；
+    # 接持久 DB（Cloud SQL）的正式環境設 false，避免清空行程後冷啟動又把 demo 種回來。
+    seed_on_empty: bool = True
 
     # ── 網頁登入驗證 ──────────────────────────────────────────
     # 單人自用：一個登入密碼 + 一把 JWT 簽章密鑰，皆從環境變數注入。
