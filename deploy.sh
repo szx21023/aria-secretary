@@ -66,6 +66,13 @@ if [ -n "$CLOUDSQL_INSTANCE" ]; then
     *"$CLOUDSQL_INSTANCE"*) ;;
     *) echo "ERROR: DATABASE_URL 的 host=/cloudsql/... 連線名稱與 CLOUDSQL_INSTANCE（$CLOUDSQL_INSTANCE）不一致" >&2; exit 1;;
   esac
+else
+  # 反向守門：DATABASE_URL 已是 Postgres 卻沒設 CLOUDSQL_INSTANCE，則 --add-cloudsql-instances
+  # 不會掛、/cloudsql/<連線名稱> socket 不存在，啟動時 init_db() 連線即失敗（崩潰但訊息晦澀）。
+  # 部署前明確擋下，給出可讀的中文錯誤而非 libpq 的 socket 天書。
+  case "$DB_URL" in
+    postgresql*) echo "ERROR: DATABASE_URL 是 Postgres 但未設 CLOUDSQL_INSTANCE；Cloud Run 不會掛 /cloudsql socket，啟動即連線失敗。請在 deploy.env 設 CLOUDSQL_INSTANCE=PROJECT:REGION:INSTANCE" >&2; exit 1;;
+  esac
 fi
 
 # DB_URL 是 operator 提供的值（Postgres 密碼可能含任意字元）；含 '|' 會破壞下面的 ^|^ 分隔。
