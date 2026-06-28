@@ -38,7 +38,8 @@ async def lifespan(app: FastAPI):
     _setup_logging()
     await init_db()
     async with AsyncSessionLocal() as db:
-        await seed_if_empty(db)
+        if settings.seed_on_empty:
+            await seed_if_empty(db)
         # 啟動時先確保全域 conversation 存在，這樣 webhook 背景工作與推播排程器
         # 之後都只走 SELECT 分支，不會兩條路同時 INSERT 出兩個 conversation、
         # 把「網頁與 LINE 共用單一記憶」的前提拆掉。

@@ -80,7 +80,7 @@ case "$DB_URL" in *\|*) echo "ERROR: DATABASE_URL 不可含 '|'（與部署分�
 
 # 用 ^|^ 自訂分隔符：值含 @（Postgres URL）、+/=（LINE token）等特殊字元，pipe 不會出現在任何值中
 # （APP_PASSWORD 與 DATABASE_URL 已於上方明確擋下含 '|' 的情形）。
-ENV_VARS="^|^DATABASE_URL=${DB_URL}|APP_TZ=Asia/Taipei|CORS_ORIGINS=*|ANTHROPIC_API_KEY=${KEY}|APP_PASSWORD=${APP_PASSWORD}|AUTH_SECRET=${AUTH_SECRET}"
+ENV_VARS="^|^DATABASE_URL=${DB_URL}|APP_TZ=Asia/Taipei|CORS_ORIGINS=*|SEED_ON_EMPTY=false|ANTHROPIC_API_KEY=${KEY}|APP_PASSWORD=${APP_PASSWORD}|AUTH_SECRET=${AUTH_SECRET}"
 
 # 選填：LINE（secret 與 token 都備齊才注入；缺任一就維持純網頁模式）
 LINE_SECRET=$(grep -E '^LINE_CHANNEL_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2-)
