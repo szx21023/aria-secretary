@@ -7,7 +7,7 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 ## 現況
 
-**M5 完成（打磨）** — 後端 FastAPI + SQLAlchemy(async) + SQLite，events/tasks/reminders
+**M5 完成（打磨）** — 後端 FastAPI + SQLAlchemy(async)，本機 SQLite／線上 Cloud SQL(Postgres)，events/tasks/reminders
 完整 CRUD 與排程服務；AI 對話層走真 Claude API（tool use）+ SSE 串流，秘書能讀也能增刪改行程／待辦，
 含衝突偵測回報與 `state_changed` 即時刷新前端。對話歷史持久化（DB 落地，reload 不消失，含串流中斷的部分回覆復原），
 前端 Vite + React + TS 四視圖 + AIRail 對話側欄 + EventDetail「請秘書改期」+ 主題設定面板
@@ -15,10 +15,19 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 **＋ LINE 串接** — Messaging API webhook 讓你在 LINE 上直接跟秘書對話（與網頁共用同一段記憶），
 背景排程器在提醒到點／行程即將開始時主動推播到 LINE。詳見下方「LINE 串接」。
-測試：後端 154 passed、前端 12 passed。
 
-里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅ → LINE 串接 ✅
-（下一步：M6 可選 — 多使用者 + auth、Docker、部署、週期性提醒重排）
+**＋ M6 部分落地** — 網頁 API 登入保護（密碼 → Bearer JWT）、`get_weather` 工具、前後端 Dockerfile
++ `deploy.sh` 一鍵部署到 Cloud Run、後端接 Cloud SQL(Postgres)。部署詳見 [`DEPLOY.md`](./DEPLOY.md)。
+
+測試：後端 197 passed、前端 34 passed。
+
+里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅
+→ LINE 串接 ✅ → M6 部分 ✅（auth／Docker／Cloud Run／Cloud SQL）
+（M6 未做：多使用者、週期性提醒自動重排、多對話 thread）
+
+> ⚠️ **線上已知問題**：Cloud Run 預設開啟 CPU throttling，回應送出後容器 CPU 即被收回，
+> 導致 (1) LINE 回覆嚴重延遲（背景 agent 凍住，需下一個請求進來才解凍）、(2) 背景推播排程器停擺。
+> 兩者同根因，解法是部署時加 `--no-cpu-throttling`。詳見 [`PLAN.md`](./PLAN.md) 技術債第 10 節。
 
 ## 跑起來
 

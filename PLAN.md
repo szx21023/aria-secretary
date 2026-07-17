@@ -287,10 +287,18 @@ aria-secretary/
    `agent.run_chat` 非串流入口；與網頁共用同一全域 conversation），加背景排程器（`services/notifier`）在提醒到點／行程即將開始時
    主動 push 到 LINE。`Reminder.fired_at` / `Event.notified_at` 防重複；`Conversation.line_user_id` 記推播收件人。
    程式碼在 `app/line/`（簽章驗證 + API client）與 `app/api/line.py`（webhook）。
-8. **M6（可選）**：多使用者 + auth、Docker、部署、週期性提醒自動重排（目前推一次）、多對話 thread（目前為單一全域 conversation）。
+8. **M6（可選，部分完成）**：
+   - [x] **auth** ✅：網頁 API 登入保護（`APP_PASSWORD` → Bearer JWT），`api/auth.py` + 前端 `AuthGate`／`lib/auth.ts`。仍是**單人**密碼制。
+   - [x] **Docker** ✅：`backend/Dockerfile`（python-slim + uvicorn）、`frontend/Dockerfile`（node build → nginx）。
+   - [x] **部署** ✅：`deploy.sh` 一鍵部署前後端到 Cloud Run（asia-east1），詳見 `DEPLOY.md`。
+   - [x] **Cloud SQL** ✅：後端接 Postgres（`aria-db`），`deploy.sh` 以 `--add-cloudsql-instances` 掛載並有雙向守門。
+   - [ ] **多使用者**：目前仍為單人（單一全域 conversation、單一密碼）。
+   - [ ] **週期性提醒自動重排**：`recurrence` 推一次後不重排。
+   - [ ] **多對話 thread**：目前為單一全域 conversation。
 
 > 行事曆三視圖（日／週／月）已於後續補上（`views/calendar/` 的 `TimeGrid`＝日/週共用、`MonthGrid`＝月）。
-> M6 的「提醒實際觸發」已隨 LINE 串接一併落地（背景排程 push）；剩餘 M6 項目仍為可選。
+> M6 的「提醒實際觸發」已隨 LINE 串接一併落地（背景排程 push）——但**線上因 CPU throttling 實際失效**，見下方技術債。
+> 另加：`get_weather` 工具（`ai/weather.py`）。
 
 ### 行事曆已知待修（PR review 後盤點，刻意未塞進三視圖 PR）
 - [x] **跨午夜／跨日行程渲染** — 已修：`lib/format` 新增 `daySegment()`（事件在某日 00:00–24:00 的可見區段），`TimeGrid` 改用它過濾＋clamp 高度、`MonthGrid` 改用它過濾，跨日行程每個重疊日各畫一段。
@@ -300,12 +308,28 @@ aria-secretary/
 ---
 
 ## 8. 環境變數 / 設定
+
+完整清單見 `backend/.env.example`；以下為重點。
+
 ```
 # backend/.env
 ANTHROPIC_API_KEY=sk-ant-...
-DATABASE_URL=sqlite+aiosqlite:///./aria.db
+APP_PASSWORD=...          # 網頁登入密碼（不可含 `@`）
+AUTH_SECRET=...           # JWT 簽章密鑰，≥32 bytes 隨機值
 CORS_ORIGINS=http://localhost:5173
 APP_TZ=Asia/Taipei
+SEED_ON_EMPTY=1           # 正式環境設 0，停用自動 demo seed
+
+# 本機：容器內 SQLite
+DATABASE_URL=sqlite+aiosqlite:///./aria.db
+# 線上：Cloud SQL(Postgres)，需搭配 deploy.env 的 CLOUDSQL_INSTANCE
+# DATABASE_URL=postgresql+asyncpg://USER:PASS@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE  # pragma: allowlist secret
+
+# LINE（選用，不填＝不啟用）
+LINE_CHANNEL_SECRET=...
+LINE_CHANNEL_ACCESS_TOKEN=...
+LINE_ALLOWED_USER_IDS=...   # 務必設，否則任何人都能透過 bot 讀你的行程
+LINE_PUSH_USER_ID=
 ```
 ```
 # frontend/.env
@@ -326,6 +350,53 @@ VITE_API_BASE=http://localhost:8000
 
 ## 10. 待辦 / 技術債（backlog）
 
+> 依優先度排序。標「線上已驗證」者為 2026-07-17 對實際部署（`dataops-317513` / asia-east1）查證的結果，
+> 非純程式碼推論。
+
+- [ ] **CPU throttling 讓「回應之後」的邏輯全部失效（最高優先，線上已驗證）** —
+  Cloud Run 預設只在處理請求期間配給 CPU，回應送出後即收回。本專案有**兩處**關鍵邏輯跑在回應之後，
+  因此同時中槍。2026-07-17 線上查證：`aria-backend` 的 annotations 只有 `maxScale=20`，
+  **沒有 `minScale`、也沒有 `run.googleapis.com/cpu-throttling`** → 兩者皆為預設（min=0、throttling 開）。
+
+  **症狀 A — LINE 回覆嚴重延遲**（實測重現）：`api/line.py:75` 先回 200 再 `background.add_task(_handle_text)`，
+  但 agent 要呼叫 Claude 的那幾秒 CPU 已被收走 → 任務凍住，**得等下一個請求進來才解凍跑完**。
+  實測：02:29:38 webhook 進來，直到 02:29:48 一個無關的 `/api/health` 打進來才解凍回覆。
+  附帶代價：LINE **reply token 約 1 分鐘過期**，逾時後 `_send()` fallback 去 `push`（`line.py:118-121`）。
+  reply 免費不限量、push 有免費額度上限 → **功能看似正常，push 額度默默在燒**。
+
+  **症狀 B — 通知排程器停擺**：`services/notifier.run_notifier()` 的 in-process `while True` 迴圈同理，
+  沒流量就凍住；醒來時多半已過 `_STALE`（10 分）視窗被「標記不推」丟掉。主動通知形同失效。
+
+  解法：
+  - (a) `--no-cpu-throttling` — **同時修好 A 和 B 的根因**，是這裡的關鍵旗標。
+    可搭 `--min-instances=1` 進一步消除冷啟動（實測約 12 秒），但會打破「GCP 約 $0」。
+  - (b) 改用 **Cloud Scheduler** 每分鐘打受保護端點驅動 `process_due()` —— **只修 B，修不了 A**。
+    webhook 的背景任務需要的是「回應送出後仍有 CPU」，那只有 (a) 給得起。原本以為 (b) 是等價的省錢替代，實際不是。
+
+- [x] **SQLite in /tmp 導致防重複機制失效** — **已解決**（PR #21，2026-06-28）。後端已接 Cloud SQL(Postgres)：
+  線上查證 `aria-db` 為 POSTGRES_16／db-f1-micro／asia-east1-c，狀態 RUNNABLE，Cloud Run 已掛
+  `cloudsql-instances: dataops-317513:asia-east1:aria-db`。資料不再隨容器重啟蒸發，`fired_at`/`notified_at` 防重複機制恢復有效。
+
+- [ ] **所有密鑰皆為明文環境變數（不只 LINE）** — 線上查證：backend 的 11 個 env var
+  **沒有任何一個**走 Secret Manager（`secretKeyRef` 全空），凡能對本專案跑 `gcloud run services describe` 者皆可見。
+  按嚴重度排序：
+  - `AUTH_SECRET` — **最嚴重**。JWT 簽章密鑰外流＝任何人可偽造登入 token，網頁 auth 直接被繞過。
+  - `ANTHROPIC_API_KEY` — 外流＝幫人付 Claude 帳單。
+  - `APP_PASSWORD` — 網頁登入密碼。
+  - `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` — 原本只記了這兩個，但上面三個其實更嚴重。
+
+  做法：改用 `--set-secrets`（`DEPLOY.md` 已提），`deploy.sh:113` 目前是 `--set-env-vars`。
+
+- [ ] **DB 連線池未設定，與 db-f1-micro 容量不匹配（潛在，目前未觸發）** —
+  `db.py:17` 的 `create_async_engine()` 沒帶任何池設定，吃 SQLAlchemy 預設
+  （`pool_size=5` + `max_overflow=10` ＝ 每實例最多 15 條連線）。而 Cloud Run `maxScale=20`、
+  Cloud SQL 是 `db-f1-micro` 且未設任何 database flag → `max_connections` 為機型預設（約 25）。
+  最壞情況 20 × 15 ＝ 300 ≫ 25。單人使用永遠碰不到 maxScale，故目前不會炸，但是顆地雷。
+
+  **更會實際咬到的是缺 `pool_pre_ping`**：CPU 被 throttle 凍結期間 Cloud SQL 端會斷掉閒置連線，
+  池中留下死連線，容器醒來第一個 query 即失敗。與上方 CPU throttling 那條連動。
+  做法：`create_async_engine(..., pool_pre_ping=True, pool_size=2, max_overflow=3)` 並視情況調降 `maxScale`。
+
 - [ ] **記錄 token 消耗量** — 目前 `ai/agent.py` 完全沒讀 `usage`，無法得知每次對話燒多少 token／成本。
   做法：在 `agent.py` 的 `final = await stream.get_final_message()` 後讀 `final.usage`
   （`input_tokens` / `output_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens`）。
@@ -334,16 +405,6 @@ VITE_API_BASE=http://localhost:8000
   之後可考慮落 DB（掛在 `messages` 或新 usage 表）。
   附註：目前未設任何 `cache_control`，prompt cache 沒開，`cache_read_input_tokens` 會一直是 0 —— 省錢可一併處理。
 
-- [ ] **LINE 通知排程器在 Cloud Run 上不可靠（重要）** — `services/notifier.run_notifier()` 是 in-process
-  asyncio 背景迴圈（每 60 秒掃一次），但部署的 Cloud Run 是 `minScale=0` + CPU throttling 預設開啟
-  → **沒請求時容器被關／CPU 被掐，迴圈停擺**，行程/提醒到點時若無流量喚醒就不會推播，
-  且醒來時多半已過 `_STALE`（10 分）視窗被「標記不推」直接丟掉。主動通知功能形同失效。
-  解法擇一：(a) `--min-instances=1 --no-cpu-throttling` 讓容器常駐（有常駐成本，會打破「GCP 約 $0」）；
-  (b) 拿掉 in-process 迴圈，改用 **Cloud Scheduler** 每分鐘打受保護的 `/internal/run-notifier` 端點驅動 `process_due()`（可續縮到零，較省）。
-
-- [ ] **SQLite in /tmp 導致防重複機制失效** — notifier 靠 `fired_at`/`notified_at` 落 DB 防重推，
-  但 DB 在容器 `/tmp`，重啟/擴縮即重置 → 已推項目復活後可能重推、或行程資料整個消失。
-  與上一項相關，正解是接 **Cloud SQL (Postgres)**（程式已支援，改 `DATABASE_URL` 即可）。
-
-- [ ] **LINE 密鑰改用 Secret Manager** — `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET`
-  目前以明文環境變數存在 Cloud Run（describe 即可見）。改用 `--set-secrets`（DEPLOY.md 已提）較安全。
+- [ ] **建置產物 `backend/aria_secretary_backend.egg-info/` 被 commit 進 repo** — 該目錄是
+  `pip install -e` 的產物，任何人跑一次安裝就會被改動、污染 `git status`。應加進 `.gitignore` 並
+  `git rm -r --cached` 移出版控。
