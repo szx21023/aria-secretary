@@ -23,7 +23,7 @@ AI 對話層用**真 Claude API（tool use）**讓秘書真的會增刪改行程
 
 里程碑：M0 骨架 ✅ → M1 CRUD ✅ → M2 四視圖 ✅ → M3 AI對話(讀) ✅ → M4 AI對話(寫) ✅ → M5 打磨 ✅
 → LINE 串接 ✅ → M6 部分 ✅（auth／Docker／Cloud Run／Cloud SQL）
-（M6 未做：多使用者、週期性提醒自動重排、多對話 thread）
+（未完成項目與技術債改由 [Notion 任務清單](https://app.notion.com/p/92b86608ba844e80b738223c497d037d) 統一追蹤）
 
 > ⚠️ **線上已知問題**：Cloud Run 預設開啟 CPU throttling，回應送出後容器 CPU 即被收回，
 > 導致 (1) LINE 回覆嚴重延遲（背景 agent 凍住，需下一個請求進來才解凍）、(2) 背景推播排程器停擺。

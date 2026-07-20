@@ -292,9 +292,7 @@ aria-secretary/
    - [x] **Docker** ✅：`backend/Dockerfile`（python-slim + uvicorn）、`frontend/Dockerfile`（node build → nginx）。
    - [x] **部署** ✅：`deploy.sh` 一鍵部署前後端到 Cloud Run（asia-east1），詳見 `DEPLOY.md`。
    - [x] **Cloud SQL** ✅：後端接 Postgres（`aria-db`），`deploy.sh` 以 `--add-cloudsql-instances` 掛載並有雙向守門。
-   - [ ] **多使用者**：目前仍為單人（單一全域 conversation、單一密碼）。
-   - [ ] **週期性提醒自動重排**：`recurrence` 推一次後不重排。
-   - [ ] **多對話 thread**：目前為單一全域 conversation。
+   - _其餘未完成項目（多使用者、週期性提醒自動重排、多對話 thread）改由 [Notion 任務清單](https://app.notion.com/p/92b86608ba844e80b738223c497d037d) 追蹤。_
 
 > 行事曆三視圖（日／週／月）已於後續補上（`views/calendar/` 的 `TimeGrid`＝日/週共用、`MonthGrid`＝月）。
 > M6 的「提醒實際觸發」已隨 LINE 串接一併落地（背景排程 push）——但**線上因 CPU throttling 實際失效**，見下方技術債。
@@ -350,61 +348,9 @@ VITE_API_BASE=http://localhost:8000
 
 ## 10. 待辦 / 技術債（backlog）
 
-> 依優先度排序。標「線上已驗證」者為 2026-07-17 對實際部署（`dataops-317513` / asia-east1）查證的結果，
-> 非純程式碼推論。
-
-- [ ] **CPU throttling 讓「回應之後」的邏輯全部失效（最高優先，線上已驗證）** —
-  Cloud Run 預設只在處理請求期間配給 CPU，回應送出後即收回。本專案有**兩處**關鍵邏輯跑在回應之後，
-  因此同時中槍。2026-07-17 線上查證：`aria-backend` 的 annotations 只有 `maxScale=20`，
-  **沒有 `minScale`、也沒有 `run.googleapis.com/cpu-throttling`** → 兩者皆為預設（min=0、throttling 開）。
-
-  **症狀 A — LINE 回覆嚴重延遲**（實測重現）：`api/line.py:75` 先回 200 再 `background.add_task(_handle_text)`，
-  但 agent 要呼叫 Claude 的那幾秒 CPU 已被收走 → 任務凍住，**得等下一個請求進來才解凍跑完**。
-  實測：02:29:38 webhook 進來，直到 02:29:48 一個無關的 `/api/health` 打進來才解凍回覆。
-  附帶代價：LINE **reply token 約 1 分鐘過期**，逾時後 `_send()` fallback 去 `push`（`line.py:118-121`）。
-  reply 免費不限量、push 有免費額度上限 → **功能看似正常，push 額度默默在燒**。
-
-  **症狀 B — 通知排程器停擺**：`services/notifier.run_notifier()` 的 in-process `while True` 迴圈同理，
-  沒流量就凍住；醒來時多半已過 `_STALE`（10 分）視窗被「標記不推」丟掉。主動通知形同失效。
-
-  解法：
-  - (a) `--no-cpu-throttling` — **同時修好 A 和 B 的根因**，是這裡的關鍵旗標。
-    可搭 `--min-instances=1` 進一步消除冷啟動（實測約 12 秒），但會打破「GCP 約 $0」。
-  - (b) 改用 **Cloud Scheduler** 每分鐘打受保護端點驅動 `process_due()` —— **只修 B，修不了 A**。
-    webhook 的背景任務需要的是「回應送出後仍有 CPU」，那只有 (a) 給得起。原本以為 (b) 是等價的省錢替代，實際不是。
-
-- [x] **SQLite in /tmp 導致防重複機制失效** — **已解決**（PR #21，2026-06-28）。後端已接 Cloud SQL(Postgres)：
-  線上查證 `aria-db` 為 POSTGRES_16／db-f1-micro／asia-east1-c，狀態 RUNNABLE，Cloud Run 已掛
-  `cloudsql-instances: dataops-317513:asia-east1:aria-db`。資料不再隨容器重啟蒸發，`fired_at`/`notified_at` 防重複機制恢復有效。
-
-- [ ] **所有密鑰皆為明文環境變數（不只 LINE）** — 線上查證：backend 的 11 個 env var
-  **沒有任何一個**走 Secret Manager（`secretKeyRef` 全空），凡能對本專案跑 `gcloud run services describe` 者皆可見。
-  按嚴重度排序：
-  - `AUTH_SECRET` — **最嚴重**。JWT 簽章密鑰外流＝任何人可偽造登入 token，網頁 auth 直接被繞過。
-  - `ANTHROPIC_API_KEY` — 外流＝幫人付 Claude 帳單。
-  - `APP_PASSWORD` — 網頁登入密碼。
-  - `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` — 原本只記了這兩個，但上面三個其實更嚴重。
-
-  做法：改用 `--set-secrets`（`DEPLOY.md` 已提），`deploy.sh:113` 目前是 `--set-env-vars`。
-
-- [ ] **DB 連線池未設定，與 db-f1-micro 容量不匹配（潛在，目前未觸發）** —
-  `db.py:17` 的 `create_async_engine()` 沒帶任何池設定，吃 SQLAlchemy 預設
-  （`pool_size=5` + `max_overflow=10` ＝ 每實例最多 15 條連線）。而 Cloud Run `maxScale=20`、
-  Cloud SQL 是 `db-f1-micro` 且未設任何 database flag → `max_connections` 為機型預設（約 25）。
-  最壞情況 20 × 15 ＝ 300 ≫ 25。單人使用永遠碰不到 maxScale，故目前不會炸，但是顆地雷。
-
-  **更會實際咬到的是缺 `pool_pre_ping`**：CPU 被 throttle 凍結期間 Cloud SQL 端會斷掉閒置連線，
-  池中留下死連線，容器醒來第一個 query 即失敗。與上方 CPU throttling 那條連動。
-  做法：`create_async_engine(..., pool_pre_ping=True, pool_size=2, max_overflow=3)` 並視情況調降 `maxScale`。
-
-- [ ] **記錄 token 消耗量** — 目前 `ai/agent.py` 完全沒讀 `usage`，無法得知每次對話燒多少 token／成本。
-  做法：在 `agent.py` 的 `final = await stream.get_final_message()` 後讀 `final.usage`
-  （`input_tokens` / `output_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens`）。
-  tool-use 迴圈每輪是獨立一次呼叫、各有 usage，需**跨輪加總**才是單次對話總量。
-  最低限度先 log 一筆（順手用 Opus 4.8 費率估成本：輸入 $5、輸出 $25、快取寫 $6.25、快取讀 $0.5 / 1M）；
-  之後可考慮落 DB（掛在 `messages` 或新 usage 表）。
-  附註：目前未設任何 `cache_control`，prompt cache 沒開，`cache_read_input_tokens` 會一直是 0 —— 省錢可一併處理。
-
-- [ ] **建置產物 `backend/aria_secretary_backend.egg-info/` 被 commit 進 repo** — 該目錄是
-  `pip install -e` 的產物，任何人跑一次安裝就會被改動、污染 `git status`。應加進 `.gitignore` 並
-  `git rm -r --cached` 移出版控。
+> 待辦與技術債已改由 **Notion** 統一追蹤，不再逐項記在本檔——避免任務狀態一變動就得改文件、重新 commit。
+>
+> 👉 **[任務清單（Notion）](https://app.notion.com/p/92b86608ba844e80b738223c497d037d)**
+>
+> 每筆任務的備註欄含對應檔案位置與修法。已解決的項目留存於 git 歷史與對應 PR
+> （例如「SQLite in /tmp 導致防重複機制失效」→ 已接 Cloud SQL，PR #21）。
