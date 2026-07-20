@@ -287,21 +287,12 @@ aria-secretary/
    `agent.run_chat` 非串流入口；與網頁共用同一全域 conversation），加背景排程器（`services/notifier`）在提醒到點／行程即將開始時
    主動 push 到 LINE。`Reminder.fired_at` / `Event.notified_at` 防重複；`Conversation.line_user_id` 記推播收件人。
    程式碼在 `app/line/`（簽章驗證 + API client）與 `app/api/line.py`（webhook）。
-8. **M6（可選，部分完成）**：
-   - [x] **auth** ✅：網頁 API 登入保護（`APP_PASSWORD` → Bearer JWT），`api/auth.py` + 前端 `AuthGate`／`lib/auth.ts`。仍是**單人**密碼制。
-   - [x] **Docker** ✅：`backend/Dockerfile`（python-slim + uvicorn）、`frontend/Dockerfile`（node build → nginx）。
-   - [x] **部署** ✅：`deploy.sh` 一鍵部署前後端到 Cloud Run（asia-east1），詳見 `DEPLOY.md`。
-   - [x] **Cloud SQL** ✅：後端接 Postgres（`aria-db`），`deploy.sh` 以 `--add-cloudsql-instances` 掛載並有雙向守門。
-   - _其餘未完成項目（多使用者、週期性提醒自動重排、多對話 thread）改由 [Notion 任務清單](https://app.notion.com/p/92b86608ba844e80b738223c497d037d) 追蹤。_
+8. **M6（可選，部分完成）** ✅：auth（`APP_PASSWORD` → Bearer JWT，`api/auth.py` + 前端 `AuthGate`／`lib/auth.ts`，仍單人密碼制）、Docker（前後端 Dockerfile）、部署（`deploy.sh` 一鍵上 Cloud Run，見 `DEPLOY.md`）、Cloud SQL（後端接 Postgres `aria-db`，`--add-cloudsql-instances` 掛載）。未完成項目改由 [Notion 任務清單](https://app.notion.com/p/92b86608ba844e80b738223c497d037d) 追蹤。
 
 > 行事曆三視圖（日／週／月）已於後續補上（`views/calendar/` 的 `TimeGrid`＝日/週共用、`MonthGrid`＝月）。
 > M6 的「提醒實際觸發」已隨 LINE 串接一併落地（背景排程 push）——但**線上因 CPU throttling 實際失效**，見下方技術債。
 > 另加：`get_weather` 工具（`ai/weather.py`）。
 
-### 行事曆已知待修（PR review 後盤點，刻意未塞進三視圖 PR）
-- [x] **跨午夜／跨日行程渲染** — 已修：`lib/format` 新增 `daySegment()`（事件在某日 00:00–24:00 的可見區段），`TimeGrid` 改用它過濾＋clamp 高度、`MonthGrid` 改用它過濾，跨日行程每個重疊日各畫一段。
-- [x] **`now` 不會 tick** — 已修：`CalendarView` 的 `now` 改為 state＋每分鐘 `setInterval` 更新（unmount 時清除）。
-- [x] **跨夜行程延續段的時間標籤** — 已修：延續段（事件不是該天開始的）顯示「←」表示從前一天延續而來——時間標籤前加「← 23:00」，段落矮到沒有時間標籤時改加在標題前。
 
 ---
 
@@ -337,10 +328,10 @@ VITE_API_BASE=http://localhost:8000
 ---
 
 ## 9. 待你確認 / 決策點（實作前可再對齊）
-- [x] 是否要**多使用者 + 登入** → MVP 先單人本機（未加 users/auth）。多使用者留 M6。
-- [x] 提醒（reminders）是否要**真的會在時間到時觸發通知** → MVP 先只做清單管理；實際觸發留 M6。
-- [x] 「現在時間」 → 用**真實系統時間** + seed 以「今天」為錨。
-- [x] 主題設定面板要不要做（原 Tweaks）→ M5 已做（色彩主題 + 光暈強度，localStorage 持久化）。
+- **多使用者 + 登入**：MVP 先單人本機（未加 users/auth）；多使用者見 Notion 任務清單。
+- **提醒觸發通知**：MVP 先只做清單管理，實際觸發已隨 LINE 串接落地。
+- **「現在時間」**：用真實系統時間 + seed 以「今天」為錨。
+- **主題設定面板**：M5 已做（色彩主題 + 光暈強度，localStorage 持久化）。
 
 > 下一步：你確認本計畫後，我從 **M0 骨架**開始建。
 
