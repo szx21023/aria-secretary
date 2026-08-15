@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, events, line, reminders, tasks
+from app.api import auth, chat, events, life, line, reminders, tasks
 from app.api.auth import require_auth
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
@@ -84,6 +84,7 @@ app.include_router(events.router, dependencies=_protected)
 app.include_router(tasks.router, dependencies=_protected)
 app.include_router(reminders.router, dependencies=_protected)
 app.include_router(chat.router, dependencies=_protected)
+app.include_router(life.router, dependencies=_protected)
 app.include_router(line.router)
 app.include_router(auth.router)
 

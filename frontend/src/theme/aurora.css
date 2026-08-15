@@ -1312,3 +1312,223 @@ body {
   width: 100%;
   margin-top: 16px;
 }
+
+/* ---------- 人生倒數 ---------- */
+.s-life-hero {
+  padding: 30px 32px 26px;
+  text-align: right;
+}
+.s-life-hero-l {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: oklch(0.62 0.03 280);
+}
+/* 倒數數字的共用處理：極光漸層裁字。生命餘額與里程碑完全同一組數值。 */
+.s-life-num,
+.s-ms-d {
+  font-size: 68px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, oklch(0.88 0.1 var(--acc1)), oklch(0.8 0.12 var(--acc2)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* 框貼齊文字：background-clip 的漸層鋪在元素框上，框若比文字寬（區塊元素滿版），
+   數字只會落在色階的一小段，跟里程碑那種貼齊文字的框顏色就對不起來。 */
+.s-life-num {
+  width: fit-content;
+  margin: 10px 0 22px auto;
+}
+.s-life-num span,
+.s-ms-d span {
+  margin-left: 10px;
+  font-size: 22px;
+  font-weight: 500;
+  color: oklch(0.7 0.03 280);
+}
+.s-life-bar {
+  height: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: oklch(1 0 0 / 0.07);
+  border: 1px solid oklch(1 0 0 / 0.09);
+}
+.s-life-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, oklch(0.68 0.16 var(--acc1)), oklch(0.72 0.14 var(--acc2)));
+  box-shadow: 0 0 18px oklch(0.68 0.16 var(--acc1) / calc(var(--glow) * 0.9));
+  transition: width 0.6s ease;
+}
+.s-life-bar-x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12px;
+  color: oklch(0.68 0.03 280);
+}
+
+.s-life-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.s-life-stat {
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: oklch(1 0 0 / 0.05);
+  border: 1px solid oklch(1 0 0 / 0.1);
+  backdrop-filter: blur(14px);
+}
+.s-life-stat-l {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: oklch(0.68 0.03 280);
+}
+.s-life-stat-v {
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.s-life-stat-v span {
+  margin-left: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: oklch(0.66 0.03 280);
+}
+.s-life-stat-h {
+  margin-top: 4px;
+  font-size: 11px;
+  color: oklch(0.6 0.03 280);
+}
+
+.s-life-form {
+  margin-top: 20px;
+  padding: 24px 26px;
+}
+.s-life-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 14px 0 4px;
+}
+.s-life-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: oklch(0.7 0.03 280);
+}
+.s-life-fields input {
+  padding: 11px 14px;
+  border-radius: 13px;
+  border: 1px solid oklch(1 0 0 / 0.12);
+  background: oklch(1 0 0 / 0.05);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: 0.14s;
+}
+.s-life-fields input:focus {
+  border-color: oklch(0.74 0.15 var(--acc1));
+  background: oklch(1 0 0 / 0.08);
+}
+/* 深色底上的日期選擇器圖示預設是黑的，反白才看得見 */
+.s-life-fields input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.6;
+  cursor: pointer;
+}
+.s-life-err {
+  margin-top: 12px;
+  font-size: 13px;
+  color: oklch(0.72 0.17 25);
+}
+.s-life-edit {
+  width: 46px;
+  height: 46px;
+  align-self: center;
+}
+
+/* ---------- 里程碑 ---------- */
+.s-ms {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* 水平內距與 .s-life-hero 相同，兩張卡的內容左右緣才會切齊 */
+  padding: 15px 32px;
+  border-bottom: 1px solid oklch(1 0 0 / 0.06);
+}
+.s-ms:last-child {
+  border-bottom: none;
+}
+.s-ms-x {
+  flex: 1;
+  min-width: 0;
+}
+/* 標題左、天數右，與生命餘額卡的靠右大數字一致 */
+.s-ms-t {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 16px;
+}
+.s-ms-x b {
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 日期 · 進度條 · 已過/總天數，比照生命餘額卡的底部那一列 */
+.s-ms-p {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.s-ms-p small {
+  font-size: 12px;
+  color: oklch(0.65 0.03 280);
+  white-space: nowrap;
+}
+.s-ms-bar {
+  flex: 1;
+  height: 6px;
+  min-width: 60px;
+}
+.s-ms-d {
+  white-space: nowrap;
+}
+/* 「就是今天」沒有數字可裁字，改用實色，免得被 color: transparent 吃掉 */
+.s-ms-d em {
+  font-size: 34px;
+  font-style: normal;
+  color: oklch(0.82 0.12 var(--acc1));
+  -webkit-text-fill-color: oklch(0.82 0.12 var(--acc1));
+}
+.s-ms-add {
+  margin-top: 12px;
+}
+.s-ms-add .s-ms-date {
+  flex: none;
+  width: 160px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  border: 1px solid oklch(1 0 0 / 0.12);
+  background: oklch(1 0 0 / 0.05);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.s-ms-add .s-ms-date::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.6;
+  cursor: pointer;
+}

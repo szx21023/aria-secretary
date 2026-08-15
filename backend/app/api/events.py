@@ -14,7 +14,7 @@ from app.services.scheduling import INTERVAL_ERROR, interval_ok
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 # Event 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
-_REQUIRED_FIELDS = frozenset({"title", "start_at", "end_at", "category", "status"})
+_REQUIRED_FIELDS = frozenset({"title", "start_at", "end_at", "category", "status", "is_milestone"})
 
 
 async def _get_or_404(db: AsyncSession, event_id: str) -> Event:

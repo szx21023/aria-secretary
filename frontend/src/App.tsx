@@ -5,15 +5,19 @@ import { EventDetail } from "./components/EventDetail";
 import { Nav, type ViewId } from "./components/Nav";
 import { SettingsPanel } from "./components/SettingsPanel";
 import {
+  useAddMilestone,
   useAddTask,
   useEvents,
+  useLife,
   useReminders,
+  useSaveLife,
   useTasks,
   useToggleReminder,
   useToggleTask,
 } from "./hooks/useData";
 import type { Event } from "./lib/types";
 import { CalendarView } from "./views/CalendarView";
+import { LifeView } from "./views/LifeView";
 import { RemindersView } from "./views/RemindersView";
 import { TasksView } from "./views/TasksView";
 import { TodayView } from "./views/TodayView";
@@ -37,8 +41,13 @@ export default function App() {
   const events = useEvents();
   const tasks = useTasks();
   const reminders = useReminders();
+  // 人生倒數不參與下方的整頁 loading 閘門：它與行程/待辦無關，
+  // 自己在 LifeView 內處理未載入狀態，免得拖慢其他視圖的首屏。
+  const life = useLife();
 
   const addTask = useAddTask();
+  const saveLife = useSaveLife();
+  const addMilestone = useAddMilestone();
   const toggleTask = useToggleTask();
   const toggleReminder = useToggleReminder();
 
@@ -91,6 +100,15 @@ export default function App() {
               <RemindersView
                 reminders={reminderList}
                 onToggleReminder={(r) => toggleReminder.mutate({ id: r.id, enabled: r.enabled })}
+              />
+            )}
+            {view === "life" && (
+              <LifeView
+                life={life.data}
+                onSave={(body) => saveLife.mutateAsync(body)}
+                saving={saveLife.isPending}
+                onAddMilestone={(body) => addMilestone.mutateAsync(body)}
+                error={life.isError}
               />
             )}
           </>
