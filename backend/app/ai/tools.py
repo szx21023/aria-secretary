@@ -1,9 +1,11 @@
 """Claude tool 定義。description 寫清楚「何時呼叫」，提高觸發正確率。
 
-唯讀：get_schedule / find_free_slots / get_tasks / get_reminders。
+唯讀：get_schedule / find_free_slots / get_tasks / get_reminders / get_milestones。
 要完成待辦或開關提醒前，先用 get_tasks / get_reminders 看清單（同 get_schedule 之於行程）。
 寫入：create_event / reschedule_event / cancel_event / add_task / complete_task /
-      create_reminder / toggle_reminder。
+      create_reminder / toggle_reminder / create_milestone / set_milestone。
+里程碑就是被標記的行程：create_milestone 等同建立一個 is_milestone 的行程，
+set_milestone 只改標記、不動行程本身（真要刪行程請用 cancel_event）。
 改期/取消行程要先用 get_schedule 拿到 [id=...] 再帶 event_id。
 時間一律用 ISO 格式（如 2026-06-07T15:00）；system 已注入「現在時間」可據以換算。
 """
@@ -244,6 +246,61 @@ TOOLS = [
                 "enabled": {"type": "boolean", "description": "true=開啟，false=關閉。"},
             },
             "required": ["query", "enabled"],
+        },
+    },
+    {
+        "name": "get_milestones",
+        "description": (
+            "查詢使用者標記的人生里程碑（重大目標／事件）與各自的倒數天數。"
+            "當使用者問「距離我的目標還有幾天」「我有哪些里程碑」「離考照還有多久」時呼叫。"
+            "里程碑是被特別標記的行程，日常會議不會出現在這裡。"
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "create_milestone",
+        "description": (
+            "新增一個人生里程碑（重大目標或事件），例如「幫我記一個目標：明年五月考完證照」"
+            "「記一下 2027 年 2 月要去冰島」。里程碑會同時成為行事曆上的行程，並出現在人生倒數頁。"
+            "只給日期沒給時間時，預設排在當天上午 9 點、長度一小時。"
+            "一般的會議／看診／吃飯請改用 create_event，別標成里程碑。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "里程碑名稱，例如「考完 PMP 證照」。"},
+                "target_date": {
+                    "type": "string",
+                    "description": "目標日期，格式 YYYY-MM-DD。",
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "當天的時間，格式 HH:MM（可選，省略為 09:00）。",
+                },
+                "note": {"type": "string", "description": "備註（可選），例如達成條件。"},
+            },
+            "required": ["title", "target_date"],
+        },
+    },
+    {
+        "name": "set_milestone",
+        "description": (
+            "把既有行程標成里程碑，或取消其里程碑標記。"
+            "例如「把下個月的產品發表會設成里程碑」→ is_milestone=true；"
+            "「取消婚禮的里程碑標記」→ is_milestone=false（行程本身會保留，只是不再倒數）。"
+            "用 query 以標題關鍵字比對；多筆符合會回報請確認。"
+            "若使用者是要「刪掉這個行程」而非取消標記，請改用 cancel_event。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "行程標題的關鍵字（部分比對即可）。"},
+                "is_milestone": {
+                    "type": "boolean",
+                    "description": "true=標成里程碑，false=取消標記。",
+                },
+            },
+            "required": ["query", "is_milestone"],
         },
     },
 ]

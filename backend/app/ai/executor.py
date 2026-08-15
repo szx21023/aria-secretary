@@ -23,6 +23,7 @@ from app.models.event import Event
 from app.models.reminder import Reminder
 from app.models.task import Task
 from app.schemas.chat import ChangedResource
+from app.services import life as life_service
 from app.services.scheduling import detect_conflicts, find_free_slots
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,14 @@ _WRITE_TOOLS = frozenset(
         "complete_task",
         "create_reminder",
         "toggle_reminder",
+        "create_milestone",
+        "set_milestone",
     }
 )
+
+# 里程碑只給日期時，預設排在當天這個時間、長度一小時（行事曆上才有個具體區塊）
+MILESTONE_DEFAULT_TIME = time(9, 0)
+MILESTONE_DURATION_MIN = 60
 
 
 def _now_local() -> datetime:
@@ -377,6 +384,85 @@ async def toggle_reminder(db: AsyncSession, query: str, enabled: bool) -> ToolRe
     return ToolResult(f"已{state}提醒：{matches[0].title}。", changed="reminders")
 
 
+async def get_milestones(db: AsyncSession) -> str:
+    """列出未來的里程碑與倒數天數；已設生日時附上屆時歲數。"""
+    profile = await life_service.get_profile(db)
+    items = await life_service.list_milestones(db, profile.birthday if profile else None)
+    if not items:
+        return "目前沒有標記任何人生里程碑。"
+    lines = []
+    for m in items:
+        left = "就是今天" if m.days_left == 0 else f"剩 {m.days_left} 天"
+        age = f"、屆時 {m.age_at} 歲" if m.age_at is not None else ""
+        lines.append(f"- {m.title}（{m.target_date}，{left}{age}）[id={m.id}]")
+    return "人生里程碑：\n" + "\n".join(lines)
+
+
+async def create_milestone(
+    db: AsyncSession,
+    title: str,
+    target_date: str,
+    start_time: str | None = None,
+    note: str | None = None,
+) -> ToolResult:
+    """建立標為里程碑的行程。不做衝突檢查——里程碑多為全天性質的目標，
+    跟當天既有會議重疊很正常，攔下來只會多一輪無謂確認。"""
+    try:
+        day = date.fromisoformat(target_date)
+    except ValueError:
+        return ToolResult(f"日期無法解析：{target_date!r}，請用 YYYY-MM-DD 格式。")
+    clock = MILESTONE_DEFAULT_TIME
+    if start_time:
+        try:
+            clock = time.fromisoformat(start_time)
+        except ValueError:
+            return ToolResult(f"時間無法解析：{start_time!r}，請用 HH:MM 格式或省略。")
+
+    # 人生頁只倒數今天之後的里程碑，過去的日期建了也永遠不會出現——
+    # 與其回報成功卻查無此項，不如當場擋下並請使用者確認年份。
+    days_left = (day - _now_local().date()).days
+    if days_left < 0:
+        return ToolResult(
+            f"{day} 已經過去了，里程碑只倒數今天之後的日期，因此沒有建立。"
+            "請確認年份是否正確；若是要記錄已完成的事，請改用一般行程。"
+        )
+
+    start = datetime.combine(day, clock, tzinfo=_TZ).astimezone(UTC)
+    end = start + timedelta(minutes=MILESTONE_DURATION_MIN)
+    db.add(
+        Event(
+            title=title,
+            start_at=start,
+            end_at=end,
+            category=EventCategory.personal,
+            note=note,
+            is_milestone=True,
+        )
+    )
+    await db.commit()
+    left = "就是今天" if days_left == 0 else f"距今 {days_left} 天"
+    return ToolResult(f"已記下里程碑：{title}（{day}，{left}）。", changed="events")
+
+
+async def set_milestone(db: AsyncSession, query: str, is_milestone: bool) -> ToolResult:
+    """標記／取消標記既有行程。比對策略同 complete_task：先精確、唯一才退回子字串。"""
+    rows = list(await db.scalars(select(Event)))
+    matches = [e for e in rows if e.title == query] or [e for e in rows if query in e.title]
+    if not matches:
+        return ToolResult(f"找不到符合「{query}」的行程。")
+    if len(matches) > 1:
+        names = "、".join(f"{_fmt_dt(e.start_at)} {e.title}" for e in matches)
+        return ToolResult(f"有多個符合「{query}」的行程：{names}。請確認是哪一個。")
+    event = matches[0]
+    if event.is_milestone == is_milestone:
+        state = "已經是里程碑了" if is_milestone else "本來就不是里程碑"
+        return ToolResult(f"「{event.title}」{state}。")
+    event.is_milestone = is_milestone
+    await db.commit()
+    action = "已標為里程碑" if is_milestone else "已取消里程碑標記（行程保留）"
+    return ToolResult(f"「{event.title}」{action}。", changed="events")
+
+
 async def run_tool(db: AsyncSession, name: str, args: dict) -> ToolResult:
     result = await _dispatch(db, name, args)
     # 寫入工具被呼叫卻沒改到資料（找不到/模糊/衝突/壞輸入），留一筆 log。
@@ -434,4 +520,16 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
         )
     if name == "toggle_reminder":
         return await toggle_reminder(db, args["query"], args["enabled"])
+    if name == "get_milestones":
+        return ToolResult(await get_milestones(db))
+    if name == "create_milestone":
+        return await create_milestone(
+            db,
+            args["title"],
+            args["target_date"],
+            args.get("start_time"),
+            args.get("note"),
+        )
+    if name == "set_milestone":
+        return await set_milestone(db, args["query"], args["is_milestone"])
     return ToolResult(f"未知的工具：{name}")

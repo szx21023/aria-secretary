@@ -15,6 +15,10 @@ export function useReminders() {
   return useQuery({ queryKey: ["reminders"], queryFn: api.reminders });
 }
 
+export function useLife() {
+  return useQuery({ queryKey: ["life"], queryFn: api.life });
+}
+
 // ---- mutations ----
 
 export function useAddTask() {
@@ -30,6 +34,26 @@ export function useToggleTask() {
   return useMutation({
     mutationFn: (task: Task) => api.updateTask(task.id, { done: !task.done }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+}
+
+export function useSaveLife() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { birthday: string; life_expectancy: number }) => api.saveLife(body),
+    onSuccess: (life) => qc.setQueryData(["life"], life),
+  });
+}
+
+/** 新增里程碑等同新增一筆行程，人生頁與行事曆兩個 query 都要失效。 */
+export function useAddMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { title: string; target_date: string }) => api.createMilestone(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["life"] });
+      qc.invalidateQueries({ queryKey: ["events"] });
+    },
   });
 }
 

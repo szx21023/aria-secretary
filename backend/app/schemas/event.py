@@ -19,6 +19,7 @@ class EventRead(BaseModel):
     attendees: int | None = None
     status: EventStatus
     note: str | None = None
+    is_milestone: bool = False
 
 
 class EventCreate(BaseModel):
@@ -30,6 +31,7 @@ class EventCreate(BaseModel):
     attendees: int | None = None
     status: EventStatus = EventStatus.scheduled
     note: str | None = None
+    is_milestone: bool = False
 
     @model_validator(mode="after")
     def _end_after_start(self) -> "EventCreate":
@@ -53,3 +55,4 @@ class EventUpdate(BaseModel):
     attendees: int | None = None
     status: EventStatus | None = None
     note: str | None = None
+    is_milestone: bool | None = None

@@ -21,6 +21,7 @@ function ev(startHHMM: string, endHHMM: string): Event {
     attendees: null,
     status: "scheduled",
     note: null,
+    is_milestone: false,
   };
 }
 

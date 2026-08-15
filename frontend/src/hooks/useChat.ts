@@ -113,6 +113,9 @@ export function useChat() {
             else if (ev.type === "state_changed") {
               // 秘書改了資料 → 重抓對應 query，畫面即時反映
               qc.invalidateQueries({ queryKey: [ev.resource] });
+              // 里程碑是行程的衍生資料（events.is_milestone），秘書動到行程時
+              // 人生倒數頁的清單也得重抓，否則要重新整理才看得到。
+              if (ev.resource === "events") qc.invalidateQueries({ queryKey: ["life"] });
             } else if (ev.type === "error") {
               console.error("對話錯誤：", ev.message);
               fail(RETRY_MSG);
