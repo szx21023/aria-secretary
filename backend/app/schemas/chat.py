@@ -8,9 +8,12 @@ from app.models.enums import MessageRole
 # 收斂成 Literal 後，executor 端寫錯（如 "event"）會在 type-check 就擋下，不會默默不刷新。
 ChangedResource = Literal["events", "tasks", "reminders"]
 
+# 使用者單則訊息長度上限（字元）
+MESSAGE_MAX_LENGTH = 4000
+
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)
+    message: str = Field(min_length=1, max_length=MESSAGE_MAX_LENGTH)
 
 
 class MessageRead(BaseModel):
