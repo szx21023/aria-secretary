@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 _TZ = ZoneInfo(get_settings().app_tz)
 MAX_TOOL_ROUNDS = 5  # 安全上限；用完仍在 tool_use 就停，避免無限迴圈
+MAX_OUTPUT_TOKENS = 4096  # 單輪回覆的 token 上限
+DEFAULT_EFFORT = "medium"  # 思考預算（output_config.effort）
 
 
 def _now_context() -> str:
@@ -43,11 +45,11 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
     for _ in range(MAX_TOOL_ROUNDS):
         async with client.messages.stream(
             model=MODEL,
-            max_tokens=4096,
+            max_tokens=MAX_OUTPUT_TOKENS,
             system=SYSTEM_PROMPT,
             tools=TOOLS,
             thinking={"type": "adaptive"},
-            output_config={"effort": "medium"},
+            output_config={"effort": DEFAULT_EFFORT},
             messages=messages,
         ) as stream:
             async for event in stream:

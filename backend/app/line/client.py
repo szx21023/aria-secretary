@@ -18,6 +18,11 @@ _REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 _PUSH_URL = "https://api.line.me/v2/bot/message/push"
 _TIMEOUT = 10.0
 
+# LINE 單則文字硬上限 5000 字；超過就截斷到 _TEXT_TRUNCATE_AT 並補尾註，避免 API 回 400。
+_TEXT_MAX_LENGTH = 5000
+_TEXT_TRUNCATE_AT = 4990  # 上限減去留給尾註的緩衝
+_TRUNCATE_SUFFIX = "…（略）"
+
 
 def _headers(access_token: str) -> dict[str, str]:
     return {
@@ -27,9 +32,9 @@ def _headers(access_token: str) -> dict[str, str]:
 
 
 def _text_messages(text: str) -> list[dict]:
-    # LINE 單則文字上限 5000 字；秘書回覆極少超過，超過就截斷並留尾註而非讓 API 400。
-    if len(text) > 5000:
-        text = text[:4990] + "…（略）"
+    # 秘書回覆極少超過上限；超過就截斷並留尾註而非讓 API 400。
+    if len(text) > _TEXT_MAX_LENGTH:
+        text = text[:_TEXT_TRUNCATE_AT] + _TRUNCATE_SUFFIX
     return [{"type": "text", "text": text}]
 
 
