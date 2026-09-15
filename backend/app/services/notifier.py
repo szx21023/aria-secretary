@@ -70,27 +70,27 @@ async def process_due(db: AsyncSession, now: datetime | None = None) -> list[str
     # ── 提醒：trigger_at 已到、未推播 ──────────────────────────
     reminders = await db.scalars(
         select(Reminder).where(
-            Reminder.enabled.is_(True),
+            Reminder.is_enabled.is_(True),
             Reminder.fired_at.is_(None),
             Reminder.trigger_at.is_not(None),
             Reminder.trigger_at <= now,
         )
     )
-    for r in reminders:
-        if now - r.trigger_at > _STALE:
+    for reminder in reminders:
+        if now - reminder.trigger_at > _STALE:
             # 過期：放棄推播但標記，免得每輪重判（這是「不洗版」的刻意取捨）。
-            r.fired_at = now
-            logger.info("提醒「%s」已過期（trigger=%s），標記不推", r.title, r.trigger_at)
+            reminder.fired_at = now
+            logger.info("提醒「%s」已過期（trigger=%s），標記不推", reminder.title, reminder.trigger_at)
             continue
         # 在視窗內才推；push 失敗就「不標記」，下輪重試——直到成功或拖過 _STALE 視窗才放棄。
         # 不能像過期分支那樣先標記：先標記＋push 失敗 ＝ 到點提醒被永久靜默丟掉。
-        msg = f"🔔 提醒：{r.title}" + (f"\n{r.subtitle}" if r.subtitle else "")
-        if await client.push(token, target, msg):
-            r.fired_at = now
+        message = f"🔔 提醒：{reminder.title}" + (f"\n{reminder.subtitle}" if reminder.subtitle else "")
+        if await client.push(token, target, message):
+            reminder.fired_at = now
             await db.commit()  # 推成功就立刻落地，避免本輪後段出錯時把已送的標記回滾→下輪重送
-            sent.append(msg)
+            sent.append(message)
         else:
-            logger.warning("提醒「%s」推播失敗，下輪重試", r.title)
+            logger.warning("提醒「%s」推播失敗，下輪重試", reminder.title)
 
     # ── 行程：start_at <= now+lead、未推播 ────────────────────
     events = await db.scalars(
@@ -99,26 +99,26 @@ async def process_due(db: AsyncSession, now: datetime | None = None) -> list[str
             Event.start_at <= now + lead,
         )
     )
-    for e in events:
-        if e.start_at < now - _STALE:
-            e.notified_at = now  # 過期：標記放棄
-            logger.info("行程「%s」已過期（start=%s），標記不推", e.title, e.start_at)
+    for event in events:
+        if event.start_at < now - _STALE:
+            event.notified_at = now  # 過期：標記放棄
+            logger.info("行程「%s」已過期（start=%s），標記不推", event.title, event.start_at)
             continue
-        if e.start_at < now:
+        if event.start_at < now:
             # 已經開始（但還在 STALE 視窗內）：標記即可，不推「即將開始」這種馬後砲。
-            e.notified_at = now
+            event.notified_at = now
             continue
         # 即將開始：同提醒，push 成功才標記，失敗則下輪重試（拖到 start_at 過了會落入上面分支放棄）。
-        mins = round((e.start_at - now).total_seconds() / 60)
-        when = _fmt(e.start_at)
-        loc = f"\n📍 {e.location}" if e.location else ""
-        msg = f"📅 行程即將開始（約 {mins} 分鐘後）\n{when} {e.title}{loc}"
-        if await client.push(token, target, msg):
-            e.notified_at = now
+        mins = round((event.start_at - now).total_seconds() / 60)
+        when = _fmt(event.start_at)
+        loc = f"\n📍 {event.location}" if event.location else ""
+        message = f"📅 行程即將開始（約 {mins} 分鐘後）\n{when} {event.title}{loc}"
+        if await client.push(token, target, message):
+            event.notified_at = now
             await db.commit()  # 同上：推成功立刻落地
-            sent.append(msg)
+            sent.append(message)
         else:
-            logger.warning("行程「%s」推播失敗，下輪重試", e.title)
+            logger.warning("行程「%s」推播失敗，下輪重試", event.title)
 
     await db.commit()
     return sent

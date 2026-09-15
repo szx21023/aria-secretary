@@ -81,16 +81,16 @@ async def _get(url: str, params: dict, headers: dict | None = None):
     """
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-            resp = await http.get(url, params=params, headers=headers)
+            response = await http.get(url, params=params, headers=headers)
     except Exception:
         logger.exception("天氣 API 請求例外 url=%s", url)
         return None, None
-    if resp.status_code // 100 != 2:
-        logger.warning("天氣 API %s status=%s body=%s", url, resp.status_code, resp.text)
+    if response.status_code // 100 != 2:
+        logger.warning("天氣 API %s status=%s body=%s", url, response.status_code, response.text)
     try:
-        return resp.status_code, resp.json()
+        return response.status_code, response.json()
     except Exception:
-        return resp.status_code, None
+        return response.status_code, None
 
 
 async def _geocode(location: str) -> dict | None:
@@ -114,7 +114,7 @@ async def _geocode(location: str) -> dict | None:
 def _place_label(geo: dict, fallback: str) -> str:
     """從 Nominatim 的 display_name 組出簡潔地名，如「台中, 臺灣」；取首段＋國名。"""
     disp = geo.get("display_name") or geo.get("name") or fallback
-    parts = [p.strip() for p in disp.split(",") if p.strip()]
+    parts = [part.strip() for part in disp.split(",") if part.strip()]
     if not parts:
         return fallback
     if len(parts) <= 2:

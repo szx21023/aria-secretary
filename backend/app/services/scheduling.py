@@ -41,8 +41,12 @@ def detect_conflicts(
     """
     if not interval_ok(start_at, end_at):
         raise ValueError(INTERVAL_ERROR)
-    hits = [e for e in events if e.id != exclude_id and _overlaps(start_at, end_at, e.start_at, e.end_at)]
-    return sorted(hits, key=lambda e: e.start_at)
+    hits = [
+        event
+        for event in events
+        if event.id != exclude_id and _overlaps(start_at, end_at, event.start_at, event.end_at)
+    ]
+    return sorted(hits, key=lambda event: event.start_at)
 
 
 @dataclass(frozen=True)
@@ -81,10 +85,10 @@ def find_free_slots(
 
     # 只看與視窗相交的行程，並把開始/結束夾到視窗內
     clipped: list[tuple[datetime, datetime]] = []
-    for e in events:
-        if e.end_at <= window_start or e.start_at >= window_end:
+    for event in events:
+        if event.end_at <= window_start or event.start_at >= window_end:
             continue
-        clipped.append((max(e.start_at, window_start), min(e.end_at, window_end)))
+        clipped.append((max(event.start_at, window_start), min(event.end_at, window_end)))
     clipped.sort()
 
     slots: list[FreeSlot] = []

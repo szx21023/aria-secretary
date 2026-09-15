@@ -24,7 +24,7 @@ export interface Task {
   title: string;
   due_at: string | null;
   priority: TaskPriority | null;
-  done: boolean;
+  is_done: boolean;
 }
 
 export interface Reminder {
@@ -34,7 +34,7 @@ export interface Reminder {
   trigger_at: string | null;
   recurrence: string | null;
   kind: ReminderKind;
-  enabled: boolean;
+  is_enabled: boolean;
 }
 
 /** 人生倒數的推導數字。日期為 `YYYY-MM-DD`（後端以 APP_TZ 的「今天」為基準）。 */

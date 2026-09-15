@@ -84,7 +84,7 @@ def _build_events(base: datetime) -> list[Event]:
 
 
 def _build_tasks(base: datetime) -> list[Task]:
-    # (title, due_at_or_None, priority, done)
+    # (title, due_at_or_None, priority, is_done)
     rows = [
         ("回覆投資人月報信件", _at(base, 0, 17, 0), TaskPriority.high, False),
         ("確認下週東京出差機票", _at(base, 0, 23, 59), TaskPriority.high, False),
@@ -94,11 +94,14 @@ def _build_tasks(base: datetime) -> list[Task]:
         ("整理設計週會筆記", _at(base, 0, 23, 59), None, True),
         ("更新團隊 OKR 文件", _at(base, 3, 23, 59), TaskPriority.medium, True),
     ]
-    return [Task(title=t, due_at=d, priority=p, done=done) for t, d, p, done in rows]
+    return [
+        Task(title=title, due_at=due_at, priority=priority, is_done=is_done)
+        for title, due_at, priority, is_done in rows
+    ]
 
 
 def _build_reminders(base: datetime) -> list[Reminder]:
-    # (title, subtitle, trigger_at, recurrence, kind, enabled)
+    # (title, subtitle, trigger_at, recurrence, kind, is_enabled)
     rows = [
         (
             "與設計團隊週會即將開始",
@@ -128,8 +131,15 @@ def _build_reminders(base: datetime) -> list[Reminder]:
         ("每日服用維他命", "早晨例行", _at(base, 0, 8, 0), "daily", ReminderKind.health, True),
     ]
     return [
-        Reminder(title=t, subtitle=s, trigger_at=tr, recurrence=rec, kind=k, enabled=on)
-        for t, s, tr, rec, k, on in rows
+        Reminder(
+            title=title,
+            subtitle=subtitle,
+            trigger_at=trigger_at,
+            recurrence=recurrence,
+            kind=kind,
+            is_enabled=is_enabled,
+        )
+        for title, subtitle, trigger_at, recurrence, kind, is_enabled in rows
     ]
 
 

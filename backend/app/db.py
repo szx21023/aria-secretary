@@ -37,9 +37,9 @@ def _alembic_config():
     """以絕對路徑指向 alembic/，sqlalchemy.url 由 env.py 從 settings 取得。"""
     from alembic.config import Config
 
-    cfg = Config()
-    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
-    return cfg
+    config = Config()
+    config.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    return config
 
 
 def _upgrade_to_head() -> None:

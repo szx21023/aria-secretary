@@ -5,15 +5,15 @@ async def test_create_defaults(client: AsyncClient):
     r = await client.post("/api/reminders", json={"title": "媽媽生日", "kind": "birthday"})
     assert r.status_code == 201
     body = r.json()
-    assert body["enabled"] is True
+    assert body["is_enabled"] is True
     assert body["kind"] == "birthday"
 
 
 async def test_toggle_enabled(client: AsyncClient):
     created = (await client.post("/api/reminders", json={"title": "帳單", "kind": "bill"})).json()
-    r = await client.patch(f"/api/reminders/{created['id']}", json={"enabled": False})
+    r = await client.patch(f"/api/reminders/{created['id']}", json={"is_enabled": False})
     assert r.status_code == 200
-    assert r.json()["enabled"] is False
+    assert r.json()["is_enabled"] is False
 
 
 async def test_delete_then_404(client: AsyncClient):
@@ -24,13 +24,13 @@ async def test_delete_then_404(client: AsyncClient):
 
 async def test_missing_404(client: AsyncClient):
     assert (await client.get("/api/reminders/nope")).status_code == 404
-    assert (await client.patch("/api/reminders/nope", json={"enabled": False})).status_code == 404
+    assert (await client.patch("/api/reminders/nope", json={"is_enabled": False})).status_code == 404
     assert (await client.delete("/api/reminders/nope")).status_code == 404
 
 
 async def test_patch_null_required_field_is_422(client: AsyncClient):
     created = (await client.post("/api/reminders", json={"title": "x", "kind": "health"})).json()
-    assert (await client.patch(f"/api/reminders/{created['id']}", json={"enabled": None})).status_code == 422
+    assert (await client.patch(f"/api/reminders/{created['id']}", json={"is_enabled": None})).status_code == 422
     assert (await client.patch(f"/api/reminders/{created['id']}", json={"kind": None})).status_code == 422
 
 

@@ -15,7 +15,7 @@ class ReminderRead(BaseModel):
     trigger_at: datetime | None = None
     recurrence: str | None = None
     kind: ReminderKind
-    enabled: bool
+    is_enabled: bool
 
 
 class ReminderCreate(BaseModel):
@@ -24,7 +24,7 @@ class ReminderCreate(BaseModel):
     trigger_at: UTCDatetime | None = None
     recurrence: str | None = None
     kind: ReminderKind = ReminderKind.meeting
-    enabled: bool = True
+    is_enabled: bool = True
 
 
 class ReminderUpdate(BaseModel):
@@ -35,4 +35,4 @@ class ReminderUpdate(BaseModel):
     trigger_at: UTCDatetime | None = None
     recurrence: str | None = None
     kind: ReminderKind | None = None
-    enabled: bool | None = None
+    is_enabled: bool | None = None

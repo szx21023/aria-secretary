@@ -64,10 +64,10 @@ def _parse_date(s: str | None) -> date:
     return date.fromisoformat(s)
 
 
-def _local_day_bounds(d: date) -> tuple[datetime, datetime]:
+def _local_day_bounds(day: date) -> tuple[datetime, datetime]:
     """回傳該在地日期的 [00:00, 隔日00:00) 對應的 UTC datetime。"""
-    start = datetime.combine(d, time.min, tzinfo=_TZ).astimezone(UTC)
-    end = datetime.combine(d + timedelta(days=1), time.min, tzinfo=_TZ).astimezone(UTC)
+    start = datetime.combine(day, time.min, tzinfo=_TZ).astimezone(UTC)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=_TZ).astimezone(UTC)
     return start, end
 
 
@@ -92,43 +92,45 @@ async def _events_between(db: AsyncSession, start: datetime, end: datetime) -> l
 
 async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "day") -> str:
     try:
-        d = _parse_date(date)
+        day = _parse_date(date)
     except ValueError:
         return f"日期格式無法解析：{date!r}，請用 YYYY-MM-DD，或省略代表今天。"
     now = _now_local().astimezone(UTC)
     if range == "week":
         # 該日所在週的週一～週日
-        monday = d - timedelta(days=d.weekday())
+        monday = day - timedelta(days=day.weekday())
         start, _ = _local_day_bounds(monday)
         _, end = _local_day_bounds(monday + timedelta(days=6))
         label = f"{monday.isoformat()} 那一週"
     else:
-        start, end = _local_day_bounds(d)
-        label = d.isoformat()
+        start, end = _local_day_bounds(day)
+        label = day.isoformat()
 
     events = await _events_between(db, start, end)
     if not events:
         return f"{label} 沒有任何行程。"
 
     lines = [f"{label} 共 {len(events)} 個行程："]
-    for e in events:
-        loc = f"，地點：{e.location}" if e.location else ""
-        ppl = f"，{e.attendees} 人" if e.attendees else ""
-        when = f"{e.start_at.astimezone(_TZ).strftime('%m/%d %H:%M')}–{_fmt(e.end_at)}"
-        lines.append(f"- {when} {e.title}（{e.category.value}，{_derive_status(e, now)}{loc}{ppl}）[id={e.id}]")
+    for event in events:
+        loc = f"，地點：{event.location}" if event.location else ""
+        ppl = f"，{event.attendees} 人" if event.attendees else ""
+        when = f"{event.start_at.astimezone(_TZ).strftime('%m/%d %H:%M')}–{_fmt(event.end_at)}"
+        lines.append(
+            f"- {when} {event.title}（{event.category.value}，{_derive_status(event, now)}{loc}{ppl}）[id={event.id}]"
+        )
     return "\n".join(lines)
 
 
 async def find_free_slots_tool(db: AsyncSession, date: str | None = None, min_minutes: int = 30) -> str:
     try:
-        d = _parse_date(date)
+        day = _parse_date(date)
     except ValueError:
         return f"日期格式無法解析：{date!r}，請用 YYYY-MM-DD，或省略代表今天。"
-    day_start, day_end = _local_day_bounds(d)
+    day_start, day_end = _local_day_bounds(day)
     events = await _events_between(db, day_start, day_end)
 
-    window_start = datetime.combine(d, WORK_START, tzinfo=_TZ).astimezone(UTC)
-    window_end = datetime.combine(d, WORK_END, tzinfo=_TZ).astimezone(UTC)
+    window_start = datetime.combine(day, WORK_START, tzinfo=_TZ).astimezone(UTC)
+    window_end = datetime.combine(day, WORK_END, tzinfo=_TZ).astimezone(UTC)
 
     # 已經過去的時段不算空檔（避免在 15:00 還回報今天 09:00 有空）。
     # 只要「現在」已晚於工作窗開始就往後縮（整個窗都過了則由下一行守衛攔下）；
@@ -137,40 +139,40 @@ async def find_free_slots_tool(db: AsyncSession, date: str | None = None, min_mi
     if window_start < now_utc:
         window_start = now_utc
     if window_start >= window_end:
-        return f"{d.isoformat()} 的工作時間（09:00–18:00）已經過了，沒有可安排的空檔。"
+        return f"{day.isoformat()} 的工作時間（09:00–18:00）已經過了，沒有可安排的空檔。"
 
     slots = find_free_slots(events, window_start, window_end, min_minutes=min_minutes)
     if not slots:
-        return f"{d.isoformat()} 在 09:00–18:00 之間沒有達 {min_minutes} 分鐘的空檔。"
+        return f"{day.isoformat()} 在 09:00–18:00 之間沒有達 {min_minutes} 分鐘的空檔。"
 
-    parts = [f"{_fmt(s.start)}–{_fmt(s.end)}（{round(s.minutes / 60, 1)} 小時）" for s in slots]
-    return f"{d.isoformat()} 的空檔：" + "、".join(parts)
+    parts = [f"{_fmt(slot.start)}–{_fmt(slot.end)}（{round(slot.minutes / 60, 1)} 小時）" for slot in slots]
+    return f"{day.isoformat()} 的空檔：" + "、".join(parts)
 
 
 async def get_tasks(db: AsyncSession) -> str:
-    rows = list(await db.scalars(select(Task).order_by(Task.done, Task.due_at.is_(None), Task.due_at)))
+    rows = list(await db.scalars(select(Task).order_by(Task.is_done, Task.due_at.is_(None), Task.due_at)))
     if not rows:
         return "目前沒有任何待辦。"
-    undone = sum(1 for t in rows if not t.done)
+    undone = sum(1 for task in rows if not task.is_done)
     lines = [f"待辦共 {len(rows)} 項（未完成 {undone}、已完成 {len(rows) - undone}）："]
-    for t in rows:
-        status = "已完成" if t.done else "未完成"
-        prio = f"，{t.priority.value}" if t.priority else ""
-        due = f"，到期 {_fmt_dt(t.due_at)}" if t.due_at else ""
-        lines.append(f"- {t.title}（{status}{prio}{due}）")
+    for task in rows:
+        status = "已完成" if task.is_done else "未完成"
+        prio = f"，{task.priority.value}" if task.priority else ""
+        due = f"，到期 {_fmt_dt(task.due_at)}" if task.due_at else ""
+        lines.append(f"- {task.title}（{status}{prio}{due}）")
     return "\n".join(lines)
 
 
 async def get_reminders(db: AsyncSession) -> str:
-    rows = list(await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at)))
+    rows = list(await db.scalars(select(Reminder).order_by(Reminder.is_enabled.desc(), Reminder.trigger_at)))
     if not rows:
         return "目前沒有任何提醒。"
     lines = [f"提醒共 {len(rows)} 則："]
-    for r in rows:
-        state = "啟用中" if r.enabled else "已關閉"
-        sub = f"，{r.subtitle}" if r.subtitle else ""
-        when = f"，{_fmt_dt(r.trigger_at)}" if r.trigger_at else ""
-        lines.append(f"- {r.title}（{state}，{r.kind.value}{sub}{when}）")
+    for reminder in rows:
+        state = "啟用中" if reminder.is_enabled else "已關閉"
+        sub = f"，{reminder.subtitle}" if reminder.subtitle else ""
+        when = f"，{_fmt_dt(reminder.trigger_at)}" if reminder.trigger_at else ""
+        lines.append(f"- {reminder.title}（{state}，{reminder.kind.value}{sub}{when}）")
     return "\n".join(lines)
 
 
@@ -202,7 +204,7 @@ def _fmt_dt(dt: datetime) -> str:
 
 
 def _conflict_msg(conflicts: list[Event]) -> str:
-    items = "、".join(f"{_fmt(c.start_at)}–{_fmt(c.end_at)} {c.title}" for c in conflicts)
+    items = "、".join(f"{_fmt(conflict.start_at)}–{_fmt(conflict.end_at)} {conflict.title}" for conflict in conflicts)
     return f"時間衝突：與 {items} 重疊。"
 
 
@@ -331,16 +333,18 @@ async def complete_task(db: AsyncSession, query: str) -> ToolResult:
     rows = list(await db.scalars(select(Task)))
     # 先精確比對整個標題，唯一才退回子字串：避免短關鍵字偶然命中而默默改錯目標。
     # 模糊度看「全部符合數」而非只看未完成——一完成一未完成時也回報請確認，不擅自挑未完成那筆。
-    matches = [t for t in rows if t.title == query] or [t for t in rows if query in t.title]
+    matches = [candidate for candidate in rows if candidate.title == query] or [
+        candidate for candidate in rows if query in candidate.title
+    ]
     if not matches:
         return ToolResult(f"找不到符合「{query}」的待辦。")
     if len(matches) > 1:
-        names = "、".join(t.title for t in matches)
+        names = "、".join(candidate.title for candidate in matches)
         return ToolResult(f"有多個符合「{query}」的待辦：{names}。請確認是哪一個。")
     task = matches[0]
-    if task.done:
+    if task.is_done:
         return ToolResult(f"「{task.title}」已經是完成狀態了。")
-    task.done = True
+    task.is_done = True
     await db.commit()
     return ToolResult(f"已完成待辦：{task.title}。", changed="tasks")
 
@@ -360,27 +364,29 @@ async def create_reminder(
         except ValueError:
             return ToolResult(f"提醒時間無法解析：{trigger_at!r}，請用 ISO 格式或省略。")
     try:
-        k = ReminderKind(kind) if kind else ReminderKind.meeting
+        reminder_kind = ReminderKind(kind) if kind else ReminderKind.meeting
     except ValueError:
         return ToolResult(f"未知的提醒類型：{kind!r}，可用：meeting/birthday/bill/health。")
-    db.add(Reminder(title=title, subtitle=subtitle, trigger_at=trig, kind=k, recurrence=recurrence))
+    db.add(Reminder(title=title, subtitle=subtitle, trigger_at=trig, kind=reminder_kind, recurrence=recurrence))
     await db.commit()
     suffix = f"（{recurrence}）" if recurrence else ""
     return ToolResult(f"已新增提醒：{title}{suffix}。", changed="reminders")
 
 
-async def toggle_reminder(db: AsyncSession, query: str, enabled: bool) -> ToolResult:
+async def toggle_reminder(db: AsyncSession, query: str, is_enabled: bool) -> ToolResult:
     rows = list(await db.scalars(select(Reminder)))
     # 同 complete_task：精確標題優先，唯一才退子字串——關掉錯的提醒（漏掉帳單/健康通知）後果靜默。
-    matches = [r for r in rows if r.title == query] or [r for r in rows if query in r.title]
+    matches = [candidate for candidate in rows if candidate.title == query] or [
+        candidate for candidate in rows if query in candidate.title
+    ]
     if not matches:
         return ToolResult(f"找不到符合「{query}」的提醒。")
     if len(matches) > 1:
-        names = "、".join(r.title for r in matches)
+        names = "、".join(candidate.title for candidate in matches)
         return ToolResult(f"有多個符合「{query}」的提醒：{names}。請確認是哪一個。")
-    matches[0].enabled = enabled
+    matches[0].is_enabled = is_enabled
     await db.commit()
-    state = "開啟" if enabled else "關閉"
+    state = "開啟" if is_enabled else "關閉"
     return ToolResult(f"已{state}提醒：{matches[0].title}。", changed="reminders")
 
 
@@ -391,10 +397,10 @@ async def get_milestones(db: AsyncSession) -> str:
     if not items:
         return "目前沒有標記任何人生里程碑。"
     lines = []
-    for m in items:
-        left = "就是今天" if m.days_left == 0 else f"剩 {m.days_left} 天"
-        age = f"、屆時 {m.age_at} 歲" if m.age_at is not None else ""
-        lines.append(f"- {m.title}（{m.target_date}，{left}{age}）[id={m.id}]")
+    for milestone in items:
+        left = "就是今天" if milestone.days_left == 0 else f"剩 {milestone.days_left} 天"
+        age = f"、屆時 {milestone.age_at} 歲" if milestone.age_at is not None else ""
+        lines.append(f"- {milestone.title}（{milestone.target_date}，{left}{age}）[id={milestone.id}]")
     return "人生里程碑：\n" + "\n".join(lines)
 
 
@@ -447,11 +453,13 @@ async def create_milestone(
 async def set_milestone(db: AsyncSession, query: str, is_milestone: bool) -> ToolResult:
     """標記／取消標記既有行程。比對策略同 complete_task：先精確、唯一才退回子字串。"""
     rows = list(await db.scalars(select(Event)))
-    matches = [e for e in rows if e.title == query] or [e for e in rows if query in e.title]
+    matches = [candidate for candidate in rows if candidate.title == query] or [
+        candidate for candidate in rows if query in candidate.title
+    ]
     if not matches:
         return ToolResult(f"找不到符合「{query}」的行程。")
     if len(matches) > 1:
-        names = "、".join(f"{_fmt_dt(e.start_at)} {e.title}" for e in matches)
+        names = "、".join(f"{_fmt_dt(candidate.start_at)} {candidate.title}" for candidate in matches)
         return ToolResult(f"有多個符合「{query}」的行程：{names}。請確認是哪一個。")
     event = matches[0]
     if event.is_milestone == is_milestone:

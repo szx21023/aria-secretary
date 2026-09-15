@@ -59,7 +59,7 @@ async def _seed_event(db, title, start_local, end_local) -> Event:
 
 
 async def _seed_task(db, title, done=False) -> Task:
-    t = Task(title=title, done=done)
+    t = Task(title=title, is_done=done)
     db.add(t)
     await db.commit()
     await db.refresh(t)
@@ -67,7 +67,7 @@ async def _seed_task(db, title, done=False) -> Task:
 
 
 async def _seed_reminder(db, title, enabled=True) -> Reminder:
-    r = Reminder(title=title, enabled=enabled)
+    r = Reminder(title=title, is_enabled=enabled)
     db.add(r)
     await db.commit()
     await db.refresh(r)
@@ -227,7 +227,7 @@ async def test_add_task(db):
     res = await add_task(db, "回信", due_at="2026-06-07T17:00", priority="high")
     assert res.changed == "tasks"
     t = (await _all(db, Task))[0]
-    assert t.title == "回信" and t.priority == TaskPriority.high and t.done is False
+    assert t.title == "回信" and t.priority == TaskPriority.high and t.is_done is False
     assert t.due_at == _utc(2026, 6, 7, 9)  # 17:00 local
 
 
@@ -243,7 +243,7 @@ async def test_complete_task(db):
     await _seed_task(db, "確認東京出差機票")
     res = await complete_task(db, "機票")
     assert res.changed == "tasks"
-    assert (await _all(db, Task))[0].done is True
+    assert (await _all(db, Task))[0].is_done is True
 
 
 async def test_complete_task_not_found(db):
@@ -269,7 +269,7 @@ async def test_complete_task_prefers_exact_title(db):
     await _seed_task(db, "週報告")  # 子字串也含「報告」
     res = await complete_task(db, "報告")
     assert res.changed == "tasks"  # 精確命中優先，不視為模糊
-    done = [t.title for t in await _all(db, Task) if t.done]
+    done = [t.title for t in await _all(db, Task) if t.is_done]
     assert done == ["報告"]
 
 
@@ -279,7 +279,7 @@ async def test_complete_task_ambiguous_includes_done_matches(db):
     await _seed_task(db, "買雞蛋", done=False)
     res = await complete_task(db, "買")
     assert res.changed is None and "多個" in res.text
-    done = [t.title for t in await _all(db, Task) if t.done]
+    done = [t.title for t in await _all(db, Task) if t.is_done]
     assert done == ["買牛奶"]  # 雞蛋沒被動
 
 
@@ -288,7 +288,7 @@ async def test_complete_task_substring_leaves_others_untouched(db):
     await _seed_task(db, "寫報告")
     res = await complete_task(db, "牛奶")
     assert res.changed == "tasks"
-    done = [t.title for t in await _all(db, Task) if t.done]
+    done = [t.title for t in await _all(db, Task) if t.is_done]
     assert done == ["買牛奶"]  # 報告沒被碰
 
 
@@ -299,7 +299,7 @@ async def test_create_reminder(db):
     res = await create_reminder(db, "吃維他命", subtitle="早晨例行", trigger_at="2026-06-07T08:00", kind="health")
     assert res.changed == "reminders"
     r = (await _all(db, Reminder))[0]
-    assert r.title == "吃維他命" and r.kind == ReminderKind.health and r.enabled is True
+    assert r.title == "吃維他命" and r.kind == ReminderKind.health and r.is_enabled is True
     assert r.recurrence is None  # 一次性提醒不帶週期
 
 
@@ -321,29 +321,29 @@ async def test_create_reminder_with_recurrence(db):
 
 async def test_toggle_reminder_off(db):
     await _seed_reminder(db, "信用卡帳單繳費", enabled=True)
-    res = await toggle_reminder(db, "帳單", enabled=False)
+    res = await toggle_reminder(db, "帳單", is_enabled=False)
     assert res.changed == "reminders"
-    assert (await _all(db, Reminder))[0].enabled is False
+    assert (await _all(db, Reminder))[0].is_enabled is False
 
 
 async def test_toggle_reminder_not_found(db):
-    res = await toggle_reminder(db, "x", enabled=True)
+    res = await toggle_reminder(db, "x", is_enabled=True)
     assert res.changed is None and "找不到" in res.text
 
 
 async def test_toggle_reminder_ambiguous(db):
     await _seed_reminder(db, "提醒甲")
     await _seed_reminder(db, "提醒乙")
-    res = await toggle_reminder(db, "提醒", enabled=False)
+    res = await toggle_reminder(db, "提醒", is_enabled=False)
     assert res.changed is None and "多個" in res.text
 
 
 async def test_toggle_reminder_prefers_exact_title(db):
     await _seed_reminder(db, "帳單")
     await _seed_reminder(db, "信用卡帳單繳費")
-    res = await toggle_reminder(db, "帳單", enabled=False)  # 精確命中「帳單」，不視為模糊
+    res = await toggle_reminder(db, "帳單", is_enabled=False)  # 精確命中「帳單」，不視為模糊
     assert res.changed == "reminders"
-    off = [r.title for r in await _all(db, Reminder) if not r.enabled]
+    off = [r.title for r in await _all(db, Reminder) if not r.is_enabled]
     assert off == ["帳單"]
 
 

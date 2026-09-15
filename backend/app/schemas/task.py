@@ -13,14 +13,14 @@ class TaskRead(BaseModel):
     title: str
     due_at: datetime | None = None
     priority: TaskPriority | None = None
-    done: bool
+    is_done: bool
 
 
 class TaskCreate(BaseModel):
     title: str
     due_at: UTCDatetime | None = None
     priority: TaskPriority | None = None
-    done: bool = False
+    is_done: bool = False
 
 
 class TaskUpdate(BaseModel):
@@ -29,4 +29,4 @@ class TaskUpdate(BaseModel):
     title: str | None = None
     due_at: UTCDatetime | None = None
     priority: TaskPriority | None = None
-    done: bool | None = None
+    is_done: bool | None = None

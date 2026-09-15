@@ -30,9 +30,9 @@ async def load_history(db: AsyncSession, convo_id: str) -> list[dict]:
     """
     rows = await db.scalars(select(Message).where(Message.conversation_id == convo_id).order_by(Message.created_at))
     hist = [
-        {"role": m.role.value, "content": m.content}
-        for m in rows
-        if m.role in (MessageRole.user, MessageRole.assistant) and m.content
+        {"role": message.role.value, "content": message.content}
+        for message in rows
+        if message.role in (MessageRole.user, MessageRole.assistant) and message.content
     ]
     while hist and hist[0]["role"] == "assistant":
         hist.pop(0)

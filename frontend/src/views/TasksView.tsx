@@ -12,7 +12,7 @@ interface Props {
 
 function TaskRow({ task, onToggle }: { task: Task; onToggle: (t: Task) => void }) {
   return (
-    <div className={"s-task" + (task.done ? " done" : "")} onClick={() => onToggle(task)}>
+    <div className={"s-task" + (task.is_done ? " done" : "")} onClick={() => onToggle(task)}>
       <span className="s-check">
         <Icon name="tick" strokeWidth={3} />
       </span>
@@ -28,8 +28,8 @@ function TaskRow({ task, onToggle }: { task: Task; onToggle: (t: Task) => void }
 
 export function TasksView({ tasks, onToggleTask, onAddTask }: Props) {
   const [val, setVal] = useState("");
-  const undone = tasks.filter((t) => !t.done);
-  const done = tasks.filter((t) => t.done);
+  const undone = tasks.filter((t) => !t.is_done);
+  const done = tasks.filter((t) => t.is_done);
 
   const add = async () => {
     const v = val.trim();

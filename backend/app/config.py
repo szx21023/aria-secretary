@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def line_enabled(self) -> bool:
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     @property
     def line_allowed_user_id_list(self) -> list[str]:
-        return [u.strip() for u in self.line_allowed_user_ids.split(",") if u.strip()]
+        return [user_id.strip() for user_id in self.line_allowed_user_ids.split(",") if user_id.strip()]
 
 
 @lru_cache
