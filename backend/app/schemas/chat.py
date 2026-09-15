@@ -12,11 +12,11 @@ ChangedResource = Literal["events", "tasks", "reminders"]
 MESSAGE_MAX_LENGTH = 4000
 
 
-class ChatRequest(BaseModel):
+class ChatRequestSchema(BaseModel):
     message: str = Field(min_length=1, max_length=MESSAGE_MAX_LENGTH)
 
 
-class MessageRead(BaseModel):
+class MessageReadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     role: MessageRole

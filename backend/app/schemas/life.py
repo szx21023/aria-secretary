@@ -10,7 +10,7 @@ MAX_LIFE_EXPECTANCY = 150
 DEFAULT_LIFE_EXPECTANCY = 80
 
 
-class LifeProfileWrite(BaseModel):
+class LifeProfileWriteSchema(BaseModel):
     """設定／更新人生倒數基準。生日的合理性（不能是未來）由 service 依 app 時區判定。"""
 
     birthday: date
@@ -21,7 +21,7 @@ class LifeProfileWrite(BaseModel):
     )
 
 
-class LifeStats(BaseModel):
+class LifeStatsSchema(BaseModel):
     """由生日＋預期壽命推導的倒數數字，全部以 app 時區的「今天」為基準。"""
 
     today: date
@@ -44,7 +44,7 @@ class LifeStats(BaseModel):
     """距離下次生日的天數；今天就是生日時為 0。"""
 
 
-class MilestoneRead(BaseModel):
+class MilestoneReadSchema(BaseModel):
     """標為 is_milestone 的未來行程，附上倒數天數。"""
 
     model_config = ConfigDict(from_attributes=True)
@@ -78,7 +78,7 @@ class MilestoneRead(BaseModel):
     note: str | None = None
 
 
-class LifeRead(BaseModel):
+class LifeReadSchema(BaseModel):
     """尚未設定生日時 birthday/stats 為 null，前端據此顯示設定表單。
 
     milestones 與生日無關：沒設定生日也照樣列出（只是 age_at 為 null）。
@@ -88,5 +88,5 @@ class LifeRead(BaseModel):
 
     birthday: date | None = None
     life_expectancy: int = DEFAULT_LIFE_EXPECTANCY
-    stats: LifeStats | None = None
-    milestones: list[MilestoneRead] = Field(default_factory=list)
+    stats: LifeStatsSchema | None = None
+    milestones: list[MilestoneReadSchema] = Field(default_factory=list)

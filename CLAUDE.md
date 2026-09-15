@@ -86,8 +86,8 @@ frontend/src/
 - 變數/函式：snake_case；類別：PascalCase；常數：UPPER_SNAKE
 - 變數名稱用完整單字，不要用縮寫或單一字元（用 `ticket` 不要用 `t`）；慣用的 loop 計數短名視情況可接受
 - 布林值用 is_/has_/should_ 開頭（如 is_active）
-- **Pydantic schema 命名（本專案慣例）**：輸入用 `Xxx(Create|Update)`（如 `EventCreate` / `TaskUpdate`）、對外輸出用 `XxxRead`（如 `EventRead`）、請求體用 `XxxRequest`。
-  > 註：本專案**不加** `Schema` 後綴（與通用範本不同），沿用既有慣例即可。
+- **Pydantic schema 命名**：類別一律以 `Schema` 結尾。語意後綴仍保留——輸入用 `Xxx(Create|Update)Schema`（如 `EventCreateSchema` / `TaskUpdateSchema`）、對外輸出用 `XxxReadSchema`（如 `EventReadSchema`）、請求體用 `XxxRequestSchema`。
+  > 註：SSE 事件協定的 `TypedDict`（`DeltaEvent` / `DoneEvent` 等）不屬 DTO schema，維持 `*Event` 命名、不加 `Schema`。
 - 私有成員以單底線開頭 `_internal`
 - 常數依使用 scope 放置：只在單一模組用就放該模組（`constants.py` 或檔案頂部），跨層才上提到共用層；環境可調的值進 `config.py`（Settings）。常數集中檔一律命名 `constants.py`
 - **列舉**：ruff 豁免 `UP042`，本專案**保留** `class X(str, Enum)` 寫法（改 `StrEnum` 對 SQLAlchemy/Pydantic 序列化行為有變動風險），沿用即可

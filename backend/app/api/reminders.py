@@ -6,7 +6,7 @@ from app.api.helpers import reject_null_fields
 from app.common.exceptions import NotFoundException
 from app.db import get_db
 from app.models.reminder import Reminder
-from app.schemas.reminder import ReminderCreate, ReminderRead, ReminderUpdate
+from app.schemas.reminder import ReminderCreateSchema, ReminderReadSchema, ReminderUpdateSchema
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
 
@@ -21,14 +21,14 @@ async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
     return reminder
 
 
-@router.get("", response_model=list[ReminderRead])
+@router.get("", response_model=list[ReminderReadSchema])
 async def list_reminders(db: AsyncSession = Depends(get_db)) -> list[Reminder]:
     result = await db.scalars(select(Reminder).order_by(Reminder.is_enabled.desc(), Reminder.trigger_at))
     return list(result)
 
 
-@router.post("", response_model=ReminderRead, status_code=status.HTTP_201_CREATED)
-async def create_reminder(payload: ReminderCreate, db: AsyncSession = Depends(get_db)) -> Reminder:
+@router.post("", response_model=ReminderReadSchema, status_code=status.HTTP_201_CREATED)
+async def create_reminder(payload: ReminderCreateSchema, db: AsyncSession = Depends(get_db)) -> Reminder:
     reminder = Reminder(**payload.model_dump())
     db.add(reminder)
     await db.commit()
@@ -36,13 +36,15 @@ async def create_reminder(payload: ReminderCreate, db: AsyncSession = Depends(ge
     return reminder
 
 
-@router.get("/{reminder_id}", response_model=ReminderRead)
+@router.get("/{reminder_id}", response_model=ReminderReadSchema)
 async def get_reminder(reminder_id: str, db: AsyncSession = Depends(get_db)) -> Reminder:
     return await _get_or_404(db, reminder_id)
 
 
-@router.patch("/{reminder_id}", response_model=ReminderRead)
-async def update_reminder(reminder_id: str, payload: ReminderUpdate, db: AsyncSession = Depends(get_db)) -> Reminder:
+@router.patch("/{reminder_id}", response_model=ReminderReadSchema)
+async def update_reminder(
+    reminder_id: str, payload: ReminderUpdateSchema, db: AsyncSession = Depends(get_db)
+) -> Reminder:
     reminder = await _get_or_404(db, reminder_id)
     changes = payload.model_dump(exclude_unset=True)
     reject_null_fields(changes, _REQUIRED_FIELDS)

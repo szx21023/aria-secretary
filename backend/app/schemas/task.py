@@ -6,7 +6,7 @@ from app.models.enums import TaskPriority
 from app.schemas.types import UTCDatetime
 
 
-class TaskRead(BaseModel):
+class TaskReadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -16,14 +16,14 @@ class TaskRead(BaseModel):
     is_done: bool
 
 
-class TaskCreate(BaseModel):
+class TaskCreateSchema(BaseModel):
     title: str
     due_at: UTCDatetime | None = None
     priority: TaskPriority | None = None
     is_done: bool = False
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdateSchema(BaseModel):
     """部分更新：只送要改的欄位。"""
 
     title: str | None = None
