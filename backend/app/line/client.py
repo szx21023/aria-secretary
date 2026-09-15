@@ -48,11 +48,11 @@ async def push(access_token: str, to_user_id: str, text: str) -> bool:
 async def _post(url: str, access_token: str, payload: dict, kind: str) -> bool:
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-            resp = await http.post(url, headers=_headers(access_token), json=payload)
-        if resp.status_code // 100 == 2:
+            response = await http.post(url, headers=_headers(access_token), json=payload)
+        if response.status_code // 100 == 2:
             return True
         # LINE 把錯誤原因（如 reply token 失效、配額用盡）放在 body，記下來才 debug 得動。
-        logger.warning("LINE %s 失敗 status=%s body=%s", kind, resp.status_code, resp.text)
+        logger.warning("LINE %s 失敗 status=%s body=%s", kind, response.status_code, response.text)
         return False
     except Exception:
         logger.exception("LINE %s 請求例外", kind)

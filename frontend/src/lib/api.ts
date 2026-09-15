@@ -33,11 +33,11 @@ export const api = {
   tasks: () => request<Task[]>("GET", "/api/tasks"),
   createTask: (body: { title: string; priority?: Task["priority"] }) =>
     request<Task>("POST", "/api/tasks", body),
-  updateTask: (id: string, body: Partial<Pick<Task, "title" | "done" | "priority">>) =>
+  updateTask: (id: string, body: Partial<Pick<Task, "title" | "is_done" | "priority">>) =>
     request<Task>("PATCH", `/api/tasks/${id}`, body),
 
   reminders: () => request<Reminder[]>("GET", "/api/reminders"),
-  updateReminder: (id: string, body: Partial<Pick<Reminder, "enabled">>) =>
+  updateReminder: (id: string, body: Partial<Pick<Reminder, "is_enabled">>) =>
     request<Reminder>("PATCH", `/api/reminders/${id}`, body),
 
   life: () => request<Life>("GET", "/api/life"),

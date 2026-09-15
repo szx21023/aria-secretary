@@ -14,4 +14,4 @@ class Task(UUIDMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200))
     due_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     priority: Mapped[TaskPriority | None] = mapped_column(SAEnum(TaskPriority), nullable=True)
-    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)

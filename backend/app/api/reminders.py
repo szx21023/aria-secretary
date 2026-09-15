@@ -11,7 +11,7 @@ from app.schemas.reminder import ReminderCreate, ReminderRead, ReminderUpdate
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
 
 # Reminder 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
-_REQUIRED_FIELDS = frozenset({"title", "kind", "enabled"})
+_REQUIRED_FIELDS = frozenset({"title", "kind", "is_enabled"})
 
 
 async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
@@ -23,7 +23,7 @@ async def _get_or_404(db: AsyncSession, reminder_id: str) -> Reminder:
 
 @router.get("", response_model=list[ReminderRead])
 async def list_reminders(db: AsyncSession = Depends(get_db)) -> list[Reminder]:
-    result = await db.scalars(select(Reminder).order_by(Reminder.enabled.desc(), Reminder.trigger_at))
+    result = await db.scalars(select(Reminder).order_by(Reminder.is_enabled.desc(), Reminder.trigger_at))
     return list(result)
 
 

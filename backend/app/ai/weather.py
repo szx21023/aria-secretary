@@ -81,16 +81,16 @@ async def _get(url: str, params: dict, headers: dict | None = None):
     """
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-            resp = await http.get(url, params=params, headers=headers)
+            response = await http.get(url, params=params, headers=headers)
     except Exception:
         logger.exception("天氣 API 請求例外 url=%s", url)
         return None, None
-    if resp.status_code // 100 != 2:
-        logger.warning("天氣 API %s status=%s body=%s", url, resp.status_code, resp.text)
+    if response.status_code // 100 != 2:
+        logger.warning("天氣 API %s status=%s body=%s", url, response.status_code, response.text)
     try:
-        return resp.status_code, resp.json()
+        return response.status_code, response.json()
     except Exception:
-        return resp.status_code, None
+        return response.status_code, None
 
 
 async def _geocode(location: str) -> dict | None:
@@ -113,8 +113,8 @@ async def _geocode(location: str) -> dict | None:
 
 def _place_label(geo: dict, fallback: str) -> str:
     """從 Nominatim 的 display_name 組出簡潔地名，如「台中, 臺灣」；取首段＋國名。"""
-    disp = geo.get("display_name") or geo.get("name") or fallback
-    parts = [p.strip() for p in disp.split(",") if p.strip()]
+    display_name = geo.get("display_name") or geo.get("name") or fallback
+    parts = [part.strip() for part in display_name.split(",") if part.strip()]
     if not parts:
         return fallback
     if len(parts) <= 2:
@@ -167,18 +167,20 @@ async def get_weather(location: str, date_str: str | None = None) -> str:
         return f"拿不到「{location}」的近期預報，請稍後再試。"
 
     codes = daily.get("weather_code") or []
-    tmax = daily.get("temperature_2m_max") or []
-    tmin = daily.get("temperature_2m_min") or []
-    pop = daily.get("precipitation_probability_max") or []
+    temp_max = daily.get("temperature_2m_max") or []
+    temp_min = daily.get("temperature_2m_min") or []
+    rain_prob = daily.get("precipitation_probability_max") or []
     label = _place_label(geo, location)
 
     lines = [f"{label} 天氣預報："]
-    for i, day in enumerate(days):
-        code = codes[i] if i < len(codes) else None
-        hi = tmax[i] if i < len(tmax) else None
-        lo = tmin[i] if i < len(tmin) else None
-        rain = pop[i] if i < len(pop) else None
-        temp = f"{round(lo)}–{round(hi)}°C" if hi is not None and lo is not None else "溫度不明"
+    for index, day in enumerate(days):
+        code = codes[index] if index < len(codes) else None
+        high_temp = temp_max[index] if index < len(temp_max) else None
+        low_temp = temp_min[index] if index < len(temp_min) else None
+        rain = rain_prob[index] if index < len(rain_prob) else None
+        temp = (
+            f"{round(low_temp)}–{round(high_temp)}°C" if high_temp is not None and low_temp is not None else "溫度不明"
+        )
         rain_txt = f"，降雨機率 {round(rain)}%" if rain is not None else ""
         lines.append(f"- {day}：{_describe_code(code)}，{temp}{rain_txt}")
     return "\n".join(lines)

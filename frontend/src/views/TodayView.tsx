@@ -17,8 +17,8 @@ export function TodayView({ events, tasks, reminders, onToggleTask, onOpenEvent 
   const today = events
     .filter((e) => isToday(e.start_at, now))
     .sort((a, b) => +new Date(a.start_at) - +new Date(b.start_at));
-  const undone = tasks.filter((t) => !t.done);
-  const upcoming = reminders.filter((r) => r.enabled).slice(0, 3);
+  const undone = tasks.filter((t) => !t.is_done);
+  const upcoming = reminders.filter((r) => r.is_enabled).slice(0, 3);
   const freeH = freeHoursToday(today);
 
   return (

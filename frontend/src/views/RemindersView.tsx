@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function RemindersView({ reminders, onToggleReminder }: Props) {
-  const activeCount = reminders.filter((r) => r.enabled).length;
+  const activeCount = reminders.filter((r) => r.is_enabled).length;
 
   return (
     <div className="s-fadein" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -48,14 +48,14 @@ export function RemindersView({ reminders, onToggleReminder }: Props) {
                     className="s-mt-due"
                     style={{
                       marginRight: 6,
-                      color: r.enabled ? "oklch(0.82 0.1 var(--acc1))" : "oklch(0.55 0.03 280)",
+                      color: r.is_enabled ? "oklch(0.82 0.1 var(--acc1))" : "oklch(0.55 0.03 280)",
                     }}
                   >
                     {fmtTime(r.trigger_at)}
                   </span>
                 )}
                 <div
-                  className={"s-tog" + (r.enabled ? " on" : "")}
+                  className={"s-tog" + (r.is_enabled ? " on" : "")}
                   onClick={() => onToggleReminder(r)}
                 />
               </div>

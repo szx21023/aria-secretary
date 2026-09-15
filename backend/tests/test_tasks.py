@@ -5,7 +5,7 @@ async def test_create_list_and_default_done_false(client: AsyncClient):
     r = await client.post("/api/tasks", json={"title": "回覆投資人月報信件", "priority": "high"})
     assert r.status_code == 201
     body = r.json()
-    assert body["done"] is False
+    assert body["is_done"] is False
     assert body["priority"] == "high"
 
     listed = (await client.get("/api/tasks")).json()
@@ -14,9 +14,9 @@ async def test_create_list_and_default_done_false(client: AsyncClient):
 
 async def test_toggle_done(client: AsyncClient):
     created = (await client.post("/api/tasks", json={"title": "整理筆記"})).json()
-    r = await client.patch(f"/api/tasks/{created['id']}", json={"done": True})
+    r = await client.patch(f"/api/tasks/{created['id']}", json={"is_done": True})
     assert r.status_code == 200
-    assert r.json()["done"] is True
+    assert r.json()["is_done"] is True
 
 
 async def test_get_task(client: AsyncClient):
@@ -29,19 +29,19 @@ async def test_get_task(client: AsyncClient):
 async def test_delete_then_404(client: AsyncClient):
     created = (await client.post("/api/tasks", json={"title": "tmp"})).json()
     assert (await client.delete(f"/api/tasks/{created['id']}")).status_code == 204
-    assert (await client.patch(f"/api/tasks/{created['id']}", json={"done": True})).status_code == 404
+    assert (await client.patch(f"/api/tasks/{created['id']}", json={"is_done": True})).status_code == 404
 
 
 async def test_missing_404(client: AsyncClient):
     assert (await client.get("/api/tasks/nope")).status_code == 404
-    assert (await client.patch("/api/tasks/nope", json={"done": True})).status_code == 404
+    assert (await client.patch("/api/tasks/nope", json={"is_done": True})).status_code == 404
     assert (await client.delete("/api/tasks/nope")).status_code == 404
 
 
 async def test_patch_null_required_field_is_422(client: AsyncClient):
     created = (await client.post("/api/tasks", json={"title": "x"})).json()
     assert (await client.patch(f"/api/tasks/{created['id']}", json={"title": None})).status_code == 422
-    assert (await client.patch(f"/api/tasks/{created['id']}", json={"done": None})).status_code == 422
+    assert (await client.patch(f"/api/tasks/{created['id']}", json={"is_done": None})).status_code == 422
 
 
 async def test_naive_due_at_coerced_to_utc(client: AsyncClient):

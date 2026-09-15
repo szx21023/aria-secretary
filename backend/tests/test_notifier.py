@@ -60,7 +60,7 @@ async def _convo_with_line(db, user_id="Uabc"):
 
 async def test_due_reminder_is_pushed_and_marked(db, _patch):
     await _convo_with_line(db)
-    r = Reminder(title="吃藥", subtitle="早晨例行", trigger_at=_NOW - timedelta(minutes=1), enabled=True)
+    r = Reminder(title="吃藥", subtitle="早晨例行", trigger_at=_NOW - timedelta(minutes=1), is_enabled=True)
     db.add(r)
     await db.commit()
 
@@ -74,7 +74,7 @@ async def test_due_reminder_is_pushed_and_marked(db, _patch):
 
 async def test_stale_reminder_marked_but_not_pushed(db, _patch):
     await _convo_with_line(db)
-    r = Reminder(title="昨天的提醒", trigger_at=_NOW - timedelta(hours=2), enabled=True)
+    r = Reminder(title="昨天的提醒", trigger_at=_NOW - timedelta(hours=2), is_enabled=True)
     db.add(r)
     await db.commit()
 
@@ -87,7 +87,7 @@ async def test_stale_reminder_marked_but_not_pushed(db, _patch):
 
 async def test_disabled_reminder_ignored(db, _patch):
     await _convo_with_line(db)
-    r = Reminder(title="關掉的", trigger_at=_NOW - timedelta(minutes=1), enabled=False)
+    r = Reminder(title="關掉的", trigger_at=_NOW - timedelta(minutes=1), is_enabled=False)
     db.add(r)
     await db.commit()
 
@@ -102,7 +102,7 @@ async def test_no_target_does_nothing(db, monkeypatch, _patch):
     # 沒設定收件人、conversation 也沒 line_user_id → 不推、不標記，等之後接上 LINE 再處理
     convo = Conversation(title="Aria", line_user_id=None)
     db.add(convo)
-    r = Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), enabled=True)
+    r = Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), is_enabled=True)
     db.add(r)
     await db.commit()
 
@@ -177,7 +177,7 @@ async def test_due_reminder_not_marked_when_push_fails(db, monkeypatch):
     monkeypatch.setattr(notifier.client, "push", failing_push)
 
     await _convo_with_line(db)
-    r = Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), enabled=True)
+    r = Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), is_enabled=True)
     db.add(r)
     await db.commit()
 
@@ -215,7 +215,7 @@ async def test_uses_configured_push_user_over_conversation(db, monkeypatch, _pat
     # 設定釘死收件人時，優先於 conversation 捕捉到的 user
     monkeypatch.setattr(notifier, "get_settings", lambda: _settings(push_user_id="Ufixed"))
     await _convo_with_line(db, user_id="Ucaptured")
-    db.add(Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), enabled=True))
+    db.add(Reminder(title="吃藥", trigger_at=_NOW - timedelta(minutes=1), is_enabled=True))
     await db.commit()
 
     await notifier.process_due(db, now=_NOW)

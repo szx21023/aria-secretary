@@ -132,8 +132,8 @@ async def list_milestones(db: AsyncSession, birthday: date | None = None) -> lis
     # 邊界放寬一天再於 Python 端用在地日期精確篩，免得 UTC/在地日界差把當天的漏掉
     cutoff = datetime.combine(today, time.min, tzinfo=_TZ) - timedelta(days=1)
     rows = await db.scalars(select(Event).where(Event.is_milestone, Event.start_at >= cutoff).order_by(Event.start_at))
-    upcoming = [e for e in rows if local_date(e.start_at) >= today]
-    return [to_milestone(e, today, birthday) for e in upcoming[:MILESTONE_LIMIT]]
+    upcoming = [event for event in rows if local_date(event.start_at) >= today]
+    return [to_milestone(event, today, birthday) for event in upcoming[:MILESTONE_LIMIT]]
 
 
 async def build_read(db: AsyncSession) -> LifeRead:

@@ -11,7 +11,7 @@ from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 # Task 的 NOT NULL 欄位，部分更新時不可被顯式設成 null
-_REQUIRED_FIELDS = frozenset({"title", "done"})
+_REQUIRED_FIELDS = frozenset({"title", "is_done"})
 
 
 async def _get_or_404(db: AsyncSession, task_id: str) -> Task:
@@ -23,7 +23,7 @@ async def _get_or_404(db: AsyncSession, task_id: str) -> Task:
 
 @router.get("", response_model=list[TaskRead])
 async def list_tasks(db: AsyncSession = Depends(get_db)) -> list[Task]:
-    result = await db.scalars(select(Task).order_by(Task.done, Task.due_at.is_(None), Task.due_at))
+    result = await db.scalars(select(Task).order_by(Task.is_done, Task.due_at.is_(None), Task.due_at))
     return list(result)
 
 

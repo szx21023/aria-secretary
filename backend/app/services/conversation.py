@@ -29,14 +29,14 @@ async def load_history(db: AsyncSession, convo_id: str) -> list[dict]:
     Anthropic 要求 messages 第一則為 user，所以去掉開頭的 assistant（例如 seed 的問候）。
     """
     rows = await db.scalars(select(Message).where(Message.conversation_id == convo_id).order_by(Message.created_at))
-    hist = [
-        {"role": m.role.value, "content": m.content}
-        for m in rows
-        if m.role in (MessageRole.user, MessageRole.assistant) and m.content
+    history = [
+        {"role": message.role.value, "content": message.content}
+        for message in rows
+        if message.role in (MessageRole.user, MessageRole.assistant) and message.content
     ]
-    while hist and hist[0]["role"] == "assistant":
-        hist.pop(0)
-    return hist
+    while history and history[0]["role"] == "assistant":
+        history.pop(0)
+    return history
 
 
 def add_user_message(db: AsyncSession, convo_id: str, content: str) -> None:

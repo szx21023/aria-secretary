@@ -38,7 +38,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
         {"role": "user", "content": f"{_now_context()}\n{user_text}"},
     ]
     full_text = ""
-    hit_cap = True  # 若迴圈正常 break（模型給出最終回覆）會改 False
+    has_hit_cap = True  # 若迴圈正常 break（模型給出最終回覆）會改 False
 
     for _ in range(MAX_TOOL_ROUNDS):
         async with client.messages.stream(
@@ -57,7 +57,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
             final = await stream.get_final_message()
 
         if final.stop_reason != "tool_use":
-            hit_cap = False
+            has_hit_cap = False
             break
 
         # 保留整段 assistant content（含 thinking 與 tool_use，簽章必須原樣回灌），執行工具後回灌
@@ -96,10 +96,10 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
         messages.append({"role": "user", "content": tool_results})
 
     text = full_text.strip()
-    if hit_cap:
+    if has_hit_cap:
         # 用盡輪數一律記一筆：就算已有部分文字，也代表模型其實沒收尾，別讓它和正常回覆在 log 裡長一樣
         logger.warning("tool round cap (%d) 用盡（text_len=%d）", MAX_TOOL_ROUNDS, len(text))
-    if hit_cap and not text:
+    if has_hit_cap and not text:
         # 連一個字都沒生出來 → 別吐空泡泡，給可重試的提示
         text = "這次的查詢有點複雜，我沒能整理出完整回覆，可以換個方式再問一次嗎？"
     yield {"type": "done", "text": text}
@@ -112,11 +112,11 @@ async def run_chat(db: AsyncSession, history: list[dict], user_text: str) -> str
     工具執行、衝突偵測、輪數上限與錯誤復原全部沿用，不另寫一套。
     """
     final_text = ""
-    async for ev in stream_chat(db, history, user_text):
-        if ev["type"] == "done":
-            final_text = ev["text"]
-        elif ev["type"] == "error":
+    async for event in stream_chat(db, history, user_text):
+        if event["type"] == "done":
+            final_text = event["text"]
+        elif event["type"] == "error":
             # stream_chat 自身不發 error（它的工具失敗是 is_error tool_result，會續跑）；
             # 這條是防呆——真有 error frame 就讓呼叫端知道，而非把空字串當成功回覆。
-            raise RuntimeError(ev["message"])
+            raise RuntimeError(event["message"])
     return final_text

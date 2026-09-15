@@ -32,7 +32,7 @@ export function useAddTask() {
 export function useToggleTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (task: Task) => api.updateTask(task.id, { done: !task.done }),
+    mutationFn: (task: Task) => api.updateTask(task.id, { is_done: !task.is_done }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
   });
 }
@@ -60,8 +60,8 @@ export function useAddMilestone() {
 export function useToggleReminder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (r: { id: string; enabled: boolean }) =>
-      api.updateReminder(r.id, { enabled: !r.enabled }),
+    mutationFn: (r: { id: string; is_enabled: boolean }) =>
+      api.updateReminder(r.id, { is_enabled: !r.is_enabled }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reminders"] }),
   });
 }

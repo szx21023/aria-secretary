@@ -54,7 +54,7 @@ export default function App() {
   const evList = events.data ?? [];
   const taskList = tasks.data ?? [];
   const reminderList = reminders.data ?? [];
-  const activeReminders = reminderList.filter((r) => r.enabled).length;
+  const activeReminders = reminderList.filter((r) => r.is_enabled).length;
 
   const loading = events.isLoading || tasks.isLoading || reminders.isLoading;
   const error = events.isError || tasks.isError || reminders.isError;
@@ -99,7 +99,7 @@ export default function App() {
             {view === "reminders" && (
               <RemindersView
                 reminders={reminderList}
-                onToggleReminder={(r) => toggleReminder.mutate({ id: r.id, enabled: r.enabled })}
+                onToggleReminder={(r) => toggleReminder.mutate({ id: r.id, is_enabled: r.is_enabled })}
               />
             )}
             {view === "life" && (
