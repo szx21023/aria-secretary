@@ -8,7 +8,7 @@ from app.api.helpers import reject_null_fields
 from app.common.exceptions import NotFoundException
 from app.db import get_db
 from app.models.event import Event
-from app.schemas.event import EventCreate, EventRead, EventUpdate
+from app.schemas.event import EventCreateSchema, EventReadSchema, EventUpdateSchema
 from app.services.scheduling import INTERVAL_ERROR, interval_ok
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -24,7 +24,7 @@ async def _get_or_404(db: AsyncSession, event_id: str) -> Event:
     return event
 
 
-@router.get("", response_model=list[EventRead])
+@router.get("", response_model=list[EventReadSchema])
 async def list_events(
     db: AsyncSession = Depends(get_db),
     start: datetime | None = Query(None, description="只取 start_at >= 此時間"),
@@ -39,8 +39,8 @@ async def list_events(
     return list(result)
 
 
-@router.post("", response_model=EventRead, status_code=status.HTTP_201_CREATED)
-async def create_event(payload: EventCreate, db: AsyncSession = Depends(get_db)) -> Event:
+@router.post("", response_model=EventReadSchema, status_code=status.HTTP_201_CREATED)
+async def create_event(payload: EventCreateSchema, db: AsyncSession = Depends(get_db)) -> Event:
     event = Event(**payload.model_dump())
     db.add(event)
     await db.commit()
@@ -48,13 +48,13 @@ async def create_event(payload: EventCreate, db: AsyncSession = Depends(get_db))
     return event
 
 
-@router.get("/{event_id}", response_model=EventRead)
+@router.get("/{event_id}", response_model=EventReadSchema)
 async def get_event(event_id: str, db: AsyncSession = Depends(get_db)) -> Event:
     return await _get_or_404(db, event_id)
 
 
-@router.patch("/{event_id}", response_model=EventRead)
-async def update_event(event_id: str, payload: EventUpdate, db: AsyncSession = Depends(get_db)) -> Event:
+@router.patch("/{event_id}", response_model=EventReadSchema)
+async def update_event(event_id: str, payload: EventUpdateSchema, db: AsyncSession = Depends(get_db)) -> Event:
     event = await _get_or_404(db, event_id)
     changes = payload.model_dump(exclude_unset=True)
     reject_null_fields(changes, _REQUIRED_FIELDS)

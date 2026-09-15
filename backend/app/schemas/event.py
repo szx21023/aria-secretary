@@ -7,7 +7,7 @@ from app.schemas.types import UTCDatetime
 from app.services.scheduling import INTERVAL_ERROR, interval_ok
 
 
-class EventRead(BaseModel):
+class EventReadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -22,7 +22,7 @@ class EventRead(BaseModel):
     is_milestone: bool = False
 
 
-class EventCreate(BaseModel):
+class EventCreateSchema(BaseModel):
     title: str
     start_at: UTCDatetime
     end_at: UTCDatetime
@@ -34,13 +34,13 @@ class EventCreate(BaseModel):
     is_milestone: bool = False
 
     @model_validator(mode="after")
-    def _end_after_start(self) -> "EventCreate":
+    def _end_after_start(self) -> "EventCreateSchema":
         if not interval_ok(self.start_at, self.end_at):
             raise ValueError(INTERVAL_ERROR)
         return self
 
 
-class EventUpdate(BaseModel):
+class EventUpdateSchema(BaseModel):
     """部分更新：只送要改的欄位。
 
     start_at / end_at 的「end 必須晚於 start」是跨欄位規則，無法在這個

@@ -6,7 +6,7 @@ from app.models.enums import ReminderKind
 from app.schemas.types import UTCDatetime
 
 
-class ReminderRead(BaseModel):
+class ReminderReadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -18,7 +18,7 @@ class ReminderRead(BaseModel):
     is_enabled: bool
 
 
-class ReminderCreate(BaseModel):
+class ReminderCreateSchema(BaseModel):
     title: str
     subtitle: str | None = None
     trigger_at: UTCDatetime | None = None
@@ -27,7 +27,7 @@ class ReminderCreate(BaseModel):
     is_enabled: bool = True
 
 
-class ReminderUpdate(BaseModel):
+class ReminderUpdateSchema(BaseModel):
     """部分更新：只送要改的欄位。"""
 
     title: str | None = None

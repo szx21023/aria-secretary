@@ -10,7 +10,7 @@ from app.ai.agent import stream_chat
 from app.db import AsyncSessionLocal, get_db
 from app.models.chat import Message
 from app.models.enums import MessageRole
-from app.schemas.chat import ChatEvent, ChatRequest, MessageRead
+from app.schemas.chat import ChatEvent, ChatRequestSchema, MessageReadSchema
 from app.services.conversation import (
     add_assistant_message,
     add_user_message,
@@ -28,7 +28,7 @@ def _sse(event: ChatEvent) -> str:
 
 
 @router.post("")
-async def chat(payload: ChatRequest) -> StreamingResponse:
+async def chat(payload: ChatRequestSchema) -> StreamingResponse:
     async def gen():
         # StreamingResponse 的 generator 在 request handler 回傳後才執行，
         # 此時 request 級 get_db session 已關閉，故串流改用獨立 session。
@@ -72,7 +72,7 @@ async def chat(payload: ChatRequest) -> StreamingResponse:
     )
 
 
-@router.get("/history", response_model=list[MessageRead])
+@router.get("/history", response_model=list[MessageReadSchema])
 async def history(db: AsyncSession = Depends(get_db)) -> list[Message]:
     convo = await get_or_create_conversation(db)
     rows = await db.scalars(select(Message).where(Message.conversation_id == convo.id).order_by(Message.created_at))

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.event import Event
 from app.models.life import LifeProfile
-from app.schemas.life import LifeRead, LifeStats, MilestoneRead
+from app.schemas.life import LifeReadSchema, LifeStatsSchema, MilestoneReadSchema
 
 _TZ = ZoneInfo(get_settings().app_tz)
 
@@ -57,7 +57,7 @@ def _next_birthday(birthday: date, today: date) -> date:
     return candidate
 
 
-def compute_stats(birthday: date, life_expectancy: int, today: date | None = None) -> LifeStats:
+def compute_stats(birthday: date, life_expectancy: int, today: date | None = None) -> LifeStatsSchema:
     """由生日與預期壽命推導倒數數字。今天早於生日（未出生）時已過部分視為 0。"""
     today = today or today_local()
     end_date = add_years(birthday, life_expectancy)
@@ -68,7 +68,7 @@ def compute_stats(birthday: date, life_expectancy: int, today: date | None = Non
     # total_days 恆 > 0（life_expectancy 最小為 1），除法安全；活過終點則封頂 100%
     percent_lived = min(100.0, round(lived_days / total_days * 100, 1))
 
-    return LifeStats(
+    return LifeStatsSchema(
         today=today,
         end_date=end_date,
         age=full_years_between(birthday, today),
@@ -90,7 +90,7 @@ def local_date(dt: datetime) -> date:
     return dt.astimezone(_TZ).date()
 
 
-def to_milestone(event: Event, today: date, birthday: date | None) -> MilestoneRead:
+def to_milestone(event: Event, today: date, birthday: date | None) -> MilestoneReadSchema:
     """進度以「這筆行程被建立的那天」為起點：分母＝目標日−建立日，分子＝今天−建立日。
 
     起點是 events.created_at，不是「被標成里程碑的那天」——把一筆早就存在的舊行程
@@ -105,7 +105,7 @@ def to_milestone(event: Event, today: date, birthday: date | None) -> MilestoneR
     elapsed_days = max(0, min((today - created).days, total_days))
     percent_elapsed = 100.0 if total_days <= 0 else round(elapsed_days / total_days * 100, 1)
 
-    return MilestoneRead(
+    return MilestoneReadSchema(
         id=event.id,
         title=event.title,
         start_at=event.start_at,
@@ -122,7 +122,7 @@ def to_milestone(event: Event, today: date, birthday: date | None) -> MilestoneR
     )
 
 
-async def list_milestones(db: AsyncSession, birthday: date | None = None) -> list[MilestoneRead]:
+async def list_milestones(db: AsyncSession, birthday: date | None = None) -> list[MilestoneReadSchema]:
     """今天（含）之後、標為里程碑的行程，由近到遠。
 
     以「在地日期」而非時間戳篩選：今天稍早的里程碑仍該整天看得見（剩 0 天），
@@ -136,14 +136,14 @@ async def list_milestones(db: AsyncSession, birthday: date | None = None) -> lis
     return [to_milestone(event, today, birthday) for event in upcoming[:MILESTONE_LIMIT]]
 
 
-async def build_read(db: AsyncSession) -> LifeRead:
+async def build_read(db: AsyncSession) -> LifeReadSchema:
     """人生頁的完整資料：基準、倒數數字、未來里程碑。"""
     profile = await get_profile(db)
     birthday = profile.birthday if profile else None
     milestones = await list_milestones(db, birthday)
     if profile is None:
-        return LifeRead(milestones=milestones)
-    return LifeRead(
+        return LifeReadSchema(milestones=milestones)
+    return LifeReadSchema(
         birthday=profile.birthday,
         life_expectancy=profile.life_expectancy,
         stats=compute_stats(profile.birthday, profile.life_expectancy),
