@@ -75,10 +75,10 @@ def _fmt(dt: datetime) -> str:
     return dt.astimezone(_TZ).strftime("%H:%M")
 
 
-def _derive_status(ev: Event, now: datetime) -> str:
-    if now >= ev.end_at:
+def _derive_status(event: Event, now: datetime) -> str:
+    if now >= event.end_at:
         return "已結束"
-    if now >= ev.start_at:
+    if now >= event.start_at:
         return "進行中"
     return "未開始"
 
@@ -112,11 +112,12 @@ async def get_schedule(db: AsyncSession, date: str | None = None, range: str = "
 
     lines = [f"{label} 共 {len(events)} 個行程："]
     for event in events:
-        loc = f"，地點：{event.location}" if event.location else ""
-        ppl = f"，{event.attendees} 人" if event.attendees else ""
+        location_text = f"，地點：{event.location}" if event.location else ""
+        attendees_text = f"，{event.attendees} 人" if event.attendees else ""
         when = f"{event.start_at.astimezone(_TZ).strftime('%m/%d %H:%M')}–{_fmt(event.end_at)}"
         lines.append(
-            f"- {when} {event.title}（{event.category.value}，{_derive_status(event, now)}{loc}{ppl}）[id={event.id}]"
+            f"- {when} {event.title}"
+            f"（{event.category.value}，{_derive_status(event, now)}{location_text}{attendees_text}）[id={event.id}]"
         )
     return "\n".join(lines)
 
@@ -157,9 +158,9 @@ async def get_tasks(db: AsyncSession) -> str:
     lines = [f"待辦共 {len(rows)} 項（未完成 {undone}、已完成 {len(rows) - undone}）："]
     for task in rows:
         status = "已完成" if task.is_done else "未完成"
-        prio = f"，{task.priority.value}" if task.priority else ""
-        due = f"，到期 {_fmt_dt(task.due_at)}" if task.due_at else ""
-        lines.append(f"- {task.title}（{status}{prio}{due}）")
+        priority_text = f"，{task.priority.value}" if task.priority else ""
+        due_text = f"，到期 {_fmt_dt(task.due_at)}" if task.due_at else ""
+        lines.append(f"- {task.title}（{status}{priority_text}{due_text}）")
     return "\n".join(lines)
 
 
@@ -170,9 +171,9 @@ async def get_reminders(db: AsyncSession) -> str:
     lines = [f"提醒共 {len(rows)} 則："]
     for reminder in rows:
         state = "啟用中" if reminder.is_enabled else "已關閉"
-        sub = f"，{reminder.subtitle}" if reminder.subtitle else ""
+        subtitle_text = f"，{reminder.subtitle}" if reminder.subtitle else ""
         when = f"，{_fmt_dt(reminder.trigger_at)}" if reminder.trigger_at else ""
-        lines.append(f"- {reminder.title}（{state}，{reminder.kind.value}{sub}{when}）")
+        lines.append(f"- {reminder.title}（{state}，{reminder.kind.value}{subtitle_text}{when}）")
     return "\n".join(lines)
 
 
@@ -235,7 +236,7 @@ async def create_event(
     if not duration_min or duration_min <= 0:
         return ToolResult("duration_min 必須是正整數（分鐘）。")
     try:
-        cat = EventCategory(category) if category else EventCategory.meeting
+        category_enum = EventCategory(category) if category else EventCategory.meeting
     except ValueError:
         return ToolResult(f"未知的分類：{category!r}，可用：meeting/focus/meal/personal。")
     end = start + timedelta(minutes=duration_min)
@@ -252,7 +253,7 @@ async def create_event(
             title=title,
             start_at=start,
             end_at=end,
-            category=cat,
+            category=category_enum,
             location=location,
             attendees=attendees,
         )
@@ -318,13 +319,13 @@ async def add_task(db: AsyncSession, title: str, due_at: str | None = None, prio
             due = _parse_dt(due_at)
         except ValueError:
             return ToolResult(f"到期時間無法解析：{due_at!r}，請用 ISO 格式或省略。")
-    prio = None
+    priority_enum = None
     if priority:
         try:
-            prio = TaskPriority(priority)
+            priority_enum = TaskPriority(priority)
         except ValueError:
             return ToolResult(f"未知的優先級：{priority!r}，可用：high/medium/low。")
-    db.add(Task(title=title, due_at=due, priority=prio))
+    db.add(Task(title=title, due_at=due, priority=priority_enum))
     await db.commit()
     return ToolResult(f"已加入待辦：{title}。", changed="tasks")
 
@@ -357,17 +358,17 @@ async def create_reminder(
     kind: str | None = None,
     recurrence: str | None = None,
 ) -> ToolResult:
-    trig = None
+    trigger_dt = None
     if trigger_at:
         try:
-            trig = _parse_dt(trigger_at)
+            trigger_dt = _parse_dt(trigger_at)
         except ValueError:
             return ToolResult(f"提醒時間無法解析：{trigger_at!r}，請用 ISO 格式或省略。")
     try:
         reminder_kind = ReminderKind(kind) if kind else ReminderKind.meeting
     except ValueError:
         return ToolResult(f"未知的提醒類型：{kind!r}，可用：meeting/birthday/bill/health。")
-    db.add(Reminder(title=title, subtitle=subtitle, trigger_at=trig, kind=reminder_kind, recurrence=recurrence))
+    db.add(Reminder(title=title, subtitle=subtitle, trigger_at=trigger_dt, kind=reminder_kind, recurrence=recurrence))
     await db.commit()
     suffix = f"（{recurrence}）" if recurrence else ""
     return ToolResult(f"已新增提醒：{title}{suffix}。", changed="reminders")
@@ -527,7 +528,7 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
             args.get("recurrence"),
         )
     if name == "toggle_reminder":
-        return await toggle_reminder(db, args["query"], args["enabled"])
+        return await toggle_reminder(db, args["query"], args["is_enabled"])
     if name == "get_milestones":
         return ToolResult(await get_milestones(db))
     if name == "create_milestone":

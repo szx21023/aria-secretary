@@ -66,16 +66,16 @@ def _build_events(base: datetime) -> list[Event]:
         (1, 10, 0, 120, "媽媽生日 · 家庭聚會", EventCategory.personal, "家", None, None),
     ]
     events: list[Event] = []
-    for day, hh, mm, dur, title, cat, loc, ppl, note in rows:
-        start = _at(base, day, hh, mm)
+    for day_offset, hour, minute, duration_min, title, category, location, attendees, note in rows:
+        start = _at(base, day_offset, hour, minute)
         events.append(
             Event(
                 title=title,
                 start_at=start,
-                end_at=start + timedelta(minutes=dur),
-                category=cat,
-                location=loc,
-                attendees=ppl,
+                end_at=start + timedelta(minutes=duration_min),
+                category=category,
+                location=location,
+                attendees=attendees,
                 status=EventStatus.scheduled,  # live/done 由 M2 依真實時間動態推導
                 note=note,
             )

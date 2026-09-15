@@ -1,7 +1,7 @@
 """背景推播排程器：提醒到點、行程即將開始時主動 push 到 LINE。
 
 lifespan 啟動一個 asyncio 迴圈，每 notifier_interval_sec 秒掃一次：
-  - 提醒：enabled 且 trigger_at 已到、尚未推播（fired_at 為 None）→ push，標 fired_at。
+  - 提醒：is_enabled 且 trigger_at 已到、尚未推播（fired_at 為 None）→ push，標 fired_at。
   - 行程：start_at <= 現在+lead 且尚未推播（notified_at 為 None）會被掃到；其中即將開始
     （start_at 在現在之後）才 push，已開始或過期的只標記不推。
 

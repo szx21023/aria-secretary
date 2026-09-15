@@ -112,11 +112,11 @@ async def run_chat(db: AsyncSession, history: list[dict], user_text: str) -> str
     工具執行、衝突偵測、輪數上限與錯誤復原全部沿用，不另寫一套。
     """
     final_text = ""
-    async for ev in stream_chat(db, history, user_text):
-        if ev["type"] == "done":
-            final_text = ev["text"]
-        elif ev["type"] == "error":
+    async for event in stream_chat(db, history, user_text):
+        if event["type"] == "done":
+            final_text = event["text"]
+        elif event["type"] == "error":
             # stream_chat 自身不發 error（它的工具失敗是 is_error tool_result，會續跑）；
             # 這條是防呆——真有 error frame 就讓呼叫端知道，而非把空字串當成功回覆。
-            raise RuntimeError(ev["message"])
+            raise RuntimeError(event["message"])
     return final_text

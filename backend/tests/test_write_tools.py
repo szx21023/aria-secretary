@@ -58,16 +58,16 @@ async def _seed_event(db, title, start_local, end_local) -> Event:
     return ev
 
 
-async def _seed_task(db, title, done=False) -> Task:
-    t = Task(title=title, is_done=done)
+async def _seed_task(db, title, is_done=False) -> Task:
+    t = Task(title=title, is_done=is_done)
     db.add(t)
     await db.commit()
     await db.refresh(t)
     return t
 
 
-async def _seed_reminder(db, title, enabled=True) -> Reminder:
-    r = Reminder(title=title, is_enabled=enabled)
+async def _seed_reminder(db, title, is_enabled=True) -> Reminder:
+    r = Reminder(title=title, is_enabled=is_enabled)
     db.add(r)
     await db.commit()
     await db.refresh(r)
@@ -252,7 +252,7 @@ async def test_complete_task_not_found(db):
 
 
 async def test_complete_task_already_done(db):
-    await _seed_task(db, "已完成事項", done=True)
+    await _seed_task(db, "已完成事項", is_done=True)
     res = await complete_task(db, "已完成")
     assert res.changed is None and "已經是完成" in res.text
 
@@ -275,8 +275,8 @@ async def test_complete_task_prefers_exact_title(db):
 
 async def test_complete_task_ambiguous_includes_done_matches(db):
     # 一完成一未完成都含「買」→ 視為模糊而回報，不擅自挑未完成那筆
-    await _seed_task(db, "買牛奶", done=True)
-    await _seed_task(db, "買雞蛋", done=False)
+    await _seed_task(db, "買牛奶", is_done=True)
+    await _seed_task(db, "買雞蛋", is_done=False)
     res = await complete_task(db, "買")
     assert res.changed is None and "多個" in res.text
     done = [t.title for t in await _all(db, Task) if t.is_done]
@@ -320,7 +320,7 @@ async def test_create_reminder_with_recurrence(db):
 
 
 async def test_toggle_reminder_off(db):
-    await _seed_reminder(db, "信用卡帳單繳費", enabled=True)
+    await _seed_reminder(db, "信用卡帳單繳費", is_enabled=True)
     res = await toggle_reminder(db, "帳單", is_enabled=False)
     assert res.changed == "reminders"
     assert (await _all(db, Reminder))[0].is_enabled is False
@@ -392,8 +392,8 @@ async def test_get_tasks_empty(db):
 
 
 async def test_get_tasks_lists_with_status(db):
-    await _seed_task(db, "回信", done=False)
-    await _seed_task(db, "已交報告", done=True)
+    await _seed_task(db, "回信", is_done=False)
+    await _seed_task(db, "已交報告", is_done=True)
     out = await get_tasks(db)
     assert "回信" in out and "未完成" in out
     assert "已交報告" in out and "已完成" in out
@@ -401,8 +401,8 @@ async def test_get_tasks_lists_with_status(db):
 
 
 async def test_get_reminders_lists_with_state(db):
-    await _seed_reminder(db, "吃藥", enabled=True)
-    await _seed_reminder(db, "繳費", enabled=False)
+    await _seed_reminder(db, "吃藥", is_enabled=True)
+    await _seed_reminder(db, "繳費", is_enabled=False)
     out = await get_reminders(db)
     assert "吃藥" in out and "啟用中" in out
     assert "繳費" in out and "已關閉" in out

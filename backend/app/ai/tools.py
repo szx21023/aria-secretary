@@ -243,9 +243,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "提醒標題的關鍵字（部分比對即可）。"},
-                "enabled": {"type": "boolean", "description": "true=開啟，false=關閉。"},
+                "is_enabled": {"type": "boolean", "description": "true=開啟，false=關閉。"},
             },
-            "required": ["query", "enabled"],
+            "required": ["query", "is_enabled"],
         },
     },
     {

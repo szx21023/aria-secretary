@@ -42,16 +42,16 @@ async def chat(payload: ChatRequest) -> StreamingResponse:
             streamed = ""
             is_saved = False
             try:
-                async for ev in stream_chat(db, history, payload.message):
-                    if ev["type"] == "delta":
-                        streamed += ev["text"]
-                    elif ev["type"] == "done":
-                        content = ev["text"] or streamed.strip()
+                async for event in stream_chat(db, history, payload.message):
+                    if event["type"] == "delta":
+                        streamed += event["text"]
+                    elif event["type"] == "done":
+                        content = event["text"] or streamed.strip()
                         if content:  # 不存空泡泡
                             add_assistant_message(db, convo.id, content)
                             await db.commit()
                         is_saved = True
-                    yield _sse(ev)
+                    yield _sse(event)
             except Exception as e:  # noqa: BLE001 — 串流中任何錯誤都回報前端 + 留 log，而非靜默
                 logger.exception("chat stream 失敗 (convo=%s)", convo.id)
                 # 已串給使用者看的部分回覆要存下來，避免 reload 後憑空消失。
