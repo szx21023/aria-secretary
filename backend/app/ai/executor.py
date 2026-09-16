@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.constants import ToolName
+from app.ai.enums import ToolName
 from app.ai.notion import read_notion_page, search_notion
 from app.ai.weather import get_weather
 from app.config import get_settings

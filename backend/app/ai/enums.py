@@ -3,15 +3,15 @@
 tool 定義（tools.py）與分派（executor.py）共用同一份，避免兩處字面值各自漂移——
 名稱對不上會讓工具靜默掉進「未知的工具」而不報錯，綁在同一個列舉就不可能只改到一邊。
 
-沿用專案慣例的 `class X(str, Enum)`（見 CLAUDE.md）：成員即字串，`==`、集合成員判斷、
-JSON 序列化都以字串值運作，與純字串常數行為等價，另外還能 iterate／驗證名稱。
+沿用專案慣例的 `class X(str, enum.Enum)`（同 models/enums.py）：成員即字串，`==`、
+集合成員判斷、JSON 序列化都以字串值運作，與純字串常數行為等價，另外還能 iterate／驗證名稱。
 """
 
-from enum import Enum, unique
+import enum
 
 
-@unique
-class ToolName(str, Enum):
+@enum.unique
+class ToolName(str, enum.Enum):
     GET_SCHEDULE = "get_schedule"
     FIND_FREE_SLOTS = "find_free_slots"
     GET_TASKS = "get_tasks"

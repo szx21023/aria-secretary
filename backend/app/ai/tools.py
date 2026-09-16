@@ -10,7 +10,7 @@ set_milestone 只改標記、不動行程本身（真要刪行程請用 cancel_e
 時間一律用 ISO 格式（如 2026-06-07T15:00）；system 已注入「現在時間」可據以換算。
 """
 
-from app.ai.constants import ToolName
+from app.ai.enums import ToolName
 
 TOOLS = [
     {
