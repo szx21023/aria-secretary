@@ -46,9 +46,12 @@ _NO_DESCEND = frozenset({"child_page", "child_database"})
 # 攤平 block 樹的每層縮排單位。
 _INDENT = "  "
 
-# 兩支工具（search／read）共用、字字相同的回覆——集中一處，改字或多語系時不會漏改也不會改到不一致。
+# 給模型讀的固定回覆，集中一處：改字或多語系時不會漏改也不會改到不一致。
+# _AUTH_FAILED / _UNREACHABLE 兩支工具共用；_QUERY_FAILED（search）與 _READ_FAILED（read）成對，
+# 語意對稱故一併具名，避免一個常數、一個字面值的參差。
 _MSG_AUTH_FAILED = "Notion 認證失敗（token 無效或已撤銷），請檢查 NOTION_API_KEY。"
 _MSG_UNREACHABLE = "Notion 服務暫時無法連線，請稍後再試。"
+_MSG_QUERY_FAILED = "Notion 查詢失敗，請稍後再試。"
 _MSG_READ_FAILED = "Notion 讀取失敗，請稍後再試。"
 
 
@@ -126,7 +129,7 @@ async def search_notion(query: str) -> str:
         return _MSG_AUTH_FAILED
     if response.status_code // 100 != 2:
         logger.warning("Notion 搜尋 status=%s body=%s", response.status_code, response.text[:300])
-        return "Notion 查詢失敗，請稍後再試。"
+        return _MSG_QUERY_FAILED
 
     try:
         body = response.json()
