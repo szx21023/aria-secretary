@@ -95,6 +95,24 @@ TOOLS = [
         },
     },
     {
+        "name": "search_notion",
+        "description": (
+            "在使用者的 Notion 中以關鍵字搜尋頁面／資料庫。當使用者問到「我在 Notion 有沒有記過…」"
+            "「幫我找 Notion 裡關於 X 的筆記／文件」「Notion 上的技術債清單」這類需要查 Notion 內容時呼叫。"
+            "回傳符合的頁面清單（類型、標題、最後編輯日、連結）。只搜得到已分享給整合的頁面。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "搜尋關鍵字，例如「技術債」「東京出差」「產品規劃」。",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "create_event",
         "description": (
             "新增一個行程／會議。當使用者要求安排、預約、加入新的行程時呼叫，"
