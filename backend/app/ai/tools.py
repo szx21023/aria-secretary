@@ -100,6 +100,7 @@ TOOLS = [
             "在使用者的 Notion 中以關鍵字搜尋頁面／資料庫。當使用者問到「我在 Notion 有沒有記過…」"
             "「幫我找 Notion 裡關於 X 的筆記／文件」「Notion 上的技術債清單」這類需要查 Notion 內容時呼叫。"
             "回傳符合的頁面清單（類型、標題、最後編輯日、連結）。只搜得到已分享給整合的頁面。"
+            "這只回清單、不含內文；要看某頁實際寫了什麼，接著用 read_notion_page 帶該頁連結讀取。"
         ),
         "input_schema": {
             "type": "object",
@@ -110,6 +111,25 @@ TOOLS = [
                 },
             },
             "required": ["query"],
+        },
+    },
+    {
+        "name": "read_notion_page",
+        "description": (
+            "讀取單一 Notion 頁面的實際內容。當使用者要看某頁「裡面寫了什麼」、要摘要／回答某份筆記或"
+            "文件的細節時呼叫——通常先用 search_notion 找到頁面拿到連結，再用本工具讀內文。"
+            "回傳頁面標題與攤平後的文字內容（含標題、清單、待辦、程式碼區塊等，巢狀會縮排）。"
+            "只讀得到已分享給整合的頁面；內容過長會截斷並註明。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "string",
+                    "description": "頁面的 Notion 連結（可直接用 search_notion 回傳的連結）或 32 碼頁面 ID。",
+                },
+            },
+            "required": ["page"],
         },
     },
     {
