@@ -10,9 +10,11 @@ set_milestone 只改標記、不動行程本身（真要刪行程請用 cancel_e
 時間一律用 ISO 格式（如 2026-06-07T15:00）；system 已注入「現在時間」可據以換算。
 """
 
+from app.ai.enums import ToolName
+
 TOOLS = [
     {
-        "name": "get_schedule",
+        "name": ToolName.GET_SCHEDULE,
         "description": (
             "查詢使用者的行程。當使用者問到任何跟行程／會議／當天安排有關的問題時呼叫，"
             "例如「今天有什麼」「這週的安排」「下午有什麼會議」「明天忙不忙」。"
@@ -34,7 +36,7 @@ TOOLS = [
         },
     },
     {
-        "name": "find_free_slots",
+        "name": ToolName.FIND_FREE_SLOTS,
         "description": (
             "找出某一天的空檔時段。當使用者問「今天有哪些空檔」「下午有空嗎」"
             "「什麼時候有時間」「排得進去嗎」時呼叫。回傳工作時間（09:00–18:00）內"
@@ -55,7 +57,7 @@ TOOLS = [
         },
     },
     {
-        "name": "get_tasks",
+        "name": ToolName.GET_TASKS,
         "description": (
             "查詢待辦清單。當使用者問待辦事項、說做完了某件事、或要標記完成某項待辦時呼叫——"
             "先看清單確認確實有對應項目，再決定是否 complete_task。"
@@ -64,7 +66,7 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
-        "name": "get_reminders",
+        "name": ToolName.GET_REMINDERS,
         "description": (
             "查詢提醒清單。當使用者要開關某個提醒、或問有哪些提醒時呼叫——"
             "先看清單確認有對應項目，再 toggle_reminder。回傳所有提醒（含啟用狀態、類型）。"
@@ -72,7 +74,7 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
-        "name": "get_weather",
+        "name": ToolName.GET_WEATHER,
         "description": (
             "查詢某地點的天氣預報。當使用者問到天氣、或要規劃出遊／外出而需要看天氣時呼叫，"
             "例如「台中週六天氣如何」「這週末適合出去玩嗎」「明天要不要帶傘」。"
@@ -95,7 +97,7 @@ TOOLS = [
         },
     },
     {
-        "name": "search_notion",
+        "name": ToolName.SEARCH_NOTION,
         "description": (
             "在使用者的 Notion 中以關鍵字搜尋頁面／資料庫。當使用者問到「我在 Notion 有沒有記過…」"
             "「幫我找 Notion 裡關於 X 的筆記／文件」「Notion 上的技術債清單」這類需要查 Notion 內容時呼叫。"
@@ -114,7 +116,7 @@ TOOLS = [
         },
     },
     {
-        "name": "read_notion_page",
+        "name": ToolName.READ_NOTION_PAGE,
         "description": (
             "讀取單一 Notion 頁面的實際內容。當使用者要看某頁「裡面寫了什麼」、要摘要／回答某份筆記或"
             "文件的細節時呼叫——通常先用 search_notion 找到頁面拿到連結，再用本工具讀內文。"
@@ -133,7 +135,7 @@ TOOLS = [
         },
     },
     {
-        "name": "create_event",
+        "name": ToolName.CREATE_EVENT,
         "description": (
             "新增一個行程／會議。當使用者要求安排、預約、加入新的行程時呼叫，"
             "例如「幫我約明天下午三點和 Kevin 開會一小時」「週五晚上七點訂位」。"
@@ -167,7 +169,7 @@ TOOLS = [
         },
     },
     {
-        "name": "reschedule_event",
+        "name": ToolName.RESCHEDULE_EVENT,
         "description": (
             "改期一個既有行程（延後、提前、改到別的時間）。先用 get_schedule 取得目標行程的 id，"
             "再帶 event_id。例如「把下午的簡報延後一小時」→ delta_min=60；"
@@ -199,7 +201,7 @@ TOOLS = [
         },
     },
     {
-        "name": "cancel_event",
+        "name": ToolName.CANCEL_EVENT,
         "description": (
             "取消／刪除一個行程。先用 get_schedule 取得 id 再帶 event_id。例如「取消明天的午餐」「把那個會議刪掉」。"
         ),
@@ -212,7 +214,7 @@ TOOLS = [
         },
     },
     {
-        "name": "add_task",
+        "name": ToolName.ADD_TASK,
         "description": (
             "新增一項待辦事項。當使用者說「提醒我做 X」「加個待辦」「記得要…」時呼叫，"
             "例如「提醒我回覆投資人信件，今天下午五點前」。"
@@ -232,7 +234,7 @@ TOOLS = [
         },
     },
     {
-        "name": "complete_task",
+        "name": ToolName.COMPLETE_TASK,
         "description": (
             "把一項待辦標記為完成。當使用者說「我做完 X 了」「X 已經處理好」時呼叫。"
             "用 query 以標題關鍵字比對；若有多筆符合會回報請使用者確認。"
@@ -246,7 +248,7 @@ TOOLS = [
         },
     },
     {
-        "name": "create_reminder",
+        "name": ToolName.CREATE_REMINDER,
         "description": (
             "新增一則提醒。當使用者要求設定提醒、通知時呼叫，"
             "例如「每天早上八點提醒我吃維他命」「帳單到期前提醒我」。"
@@ -272,7 +274,7 @@ TOOLS = [
         },
     },
     {
-        "name": "toggle_reminder",
+        "name": ToolName.TOGGLE_REMINDER,
         "description": (
             "開啟或關閉一則提醒。當使用者說「關掉 X 提醒」「把 X 提醒打開」時呼叫。"
             "用 query 以標題關鍵字比對；多筆符合會回報請確認。"
@@ -287,7 +289,7 @@ TOOLS = [
         },
     },
     {
-        "name": "get_milestones",
+        "name": ToolName.GET_MILESTONES,
         "description": (
             "查詢使用者標記的人生里程碑（重大目標／事件）與各自的倒數天數。"
             "當使用者問「距離我的目標還有幾天」「我有哪些里程碑」「離考照還有多久」時呼叫。"
@@ -296,7 +298,7 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
-        "name": "create_milestone",
+        "name": ToolName.CREATE_MILESTONE,
         "description": (
             "新增一個人生里程碑（重大目標或事件），例如「幫我記一個目標：明年五月考完證照」"
             "「記一下 2027 年 2 月要去冰島」。里程碑會同時成為行事曆上的行程，並出現在人生倒數頁。"
@@ -321,7 +323,7 @@ TOOLS = [
         },
     },
     {
-        "name": "set_milestone",
+        "name": ToolName.SET_MILESTONE,
         "description": (
             "把既有行程標成里程碑，或取消其里程碑標記。"
             "例如「把下個月的產品發表會設成里程碑」→ is_milestone=true；"

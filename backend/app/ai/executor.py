@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.enums import ToolName
 from app.ai.notion import read_notion_page, search_notion
 from app.ai.weather import get_weather
 from app.config import get_settings
@@ -38,15 +39,15 @@ WORK_END = time(18, 0)
 # 會改動資料的工具；用來判斷「呼叫了卻 changed=None」是真的 no-op（找不到/模糊/衝突/壞輸入）。
 _WRITE_TOOLS = frozenset(
     {
-        "create_event",
-        "reschedule_event",
-        "cancel_event",
-        "add_task",
-        "complete_task",
-        "create_reminder",
-        "toggle_reminder",
-        "create_milestone",
-        "set_milestone",
+        ToolName.CREATE_EVENT,
+        ToolName.RESCHEDULE_EVENT,
+        ToolName.CANCEL_EVENT,
+        ToolName.ADD_TASK,
+        ToolName.COMPLETE_TASK,
+        ToolName.CREATE_REMINDER,
+        ToolName.TOGGLE_REMINDER,
+        ToolName.CREATE_MILESTONE,
+        ToolName.SET_MILESTONE,
     }
 )
 
@@ -484,21 +485,21 @@ async def run_tool(db: AsyncSession, name: str, args: dict) -> ToolResult:
 
 # tool name → 執行函式
 async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
-    if name == "get_schedule":
+    if name == ToolName.GET_SCHEDULE:
         return ToolResult(await get_schedule(db, args.get("date"), args.get("range", "day")))
-    if name == "find_free_slots":
+    if name == ToolName.FIND_FREE_SLOTS:
         return ToolResult(await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30)))
-    if name == "get_tasks":
+    if name == ToolName.GET_TASKS:
         return ToolResult(await get_tasks(db))
-    if name == "get_reminders":
+    if name == ToolName.GET_REMINDERS:
         return ToolResult(await get_reminders(db))
-    if name == "get_weather":
+    if name == ToolName.GET_WEATHER:
         return ToolResult(await get_weather(args["location"], args.get("date")))
-    if name == "search_notion":
+    if name == ToolName.SEARCH_NOTION:
         return ToolResult(await search_notion(args["query"]))
-    if name == "read_notion_page":
+    if name == ToolName.READ_NOTION_PAGE:
         return ToolResult(await read_notion_page(args["page"]))
-    if name == "create_event":
+    if name == ToolName.CREATE_EVENT:
         return await create_event(
             db,
             args["title"],
@@ -509,7 +510,7 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
             args.get("attendees"),
             args.get("allow_conflict", False),
         )
-    if name == "reschedule_event":
+    if name == ToolName.RESCHEDULE_EVENT:
         return await reschedule_event(
             db,
             args["event_id"],
@@ -517,13 +518,13 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
             args.get("delta_min"),
             args.get("allow_conflict", False),
         )
-    if name == "cancel_event":
+    if name == ToolName.CANCEL_EVENT:
         return await cancel_event(db, args["event_id"])
-    if name == "add_task":
+    if name == ToolName.ADD_TASK:
         return await add_task(db, args["title"], args.get("due_at"), args.get("priority"))
-    if name == "complete_task":
+    if name == ToolName.COMPLETE_TASK:
         return await complete_task(db, args["query"])
-    if name == "create_reminder":
+    if name == ToolName.CREATE_REMINDER:
         return await create_reminder(
             db,
             args["title"],
@@ -532,11 +533,11 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
             args.get("kind"),
             args.get("recurrence"),
         )
-    if name == "toggle_reminder":
+    if name == ToolName.TOGGLE_REMINDER:
         return await toggle_reminder(db, args["query"], args["is_enabled"])
-    if name == "get_milestones":
+    if name == ToolName.GET_MILESTONES:
         return ToolResult(await get_milestones(db))
-    if name == "create_milestone":
+    if name == ToolName.CREATE_MILESTONE:
         return await create_milestone(
             db,
             args["title"],
@@ -544,6 +545,6 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
             args.get("start_time"),
             args.get("note"),
         )
-    if name == "set_milestone":
+    if name == ToolName.SET_MILESTONE:
         return await set_milestone(db, args["query"], args["is_milestone"])
     return ToolResult(f"未知的工具：{name}")
