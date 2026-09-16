@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     auth_secret: str = ""
     auth_token_days: int = 7  # 簽發 token 的有效天數
 
+    # ── Notion 整合（選用）──────────────────────────────────────
+    # Internal Integration token（ntn_…）。空＝未設定：search_notion 工具會回一句
+    # 「尚未設定」而非炸錯，其餘功能照常。整合需在 Notion 端把要查的頁面分享給它。
+    notion_api_key: str = ""
+
     # ── LINE 串接 ──────────────────────────────────────────────
     # 兩者皆有才視為啟用：缺任一就不掛 webhook、不啟動推播（純本機/網頁模式照常跑）。
     line_channel_secret: str = ""
@@ -43,6 +48,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def notion_enabled(self) -> bool:
+        return bool(self.notion_api_key)
 
     @property
     def line_enabled(self) -> bool:
