@@ -43,6 +43,23 @@ _HEX_RUN = re.compile(r"[0-9a-fA-F]{32,}")
 # 這些 block 本身可能有 children，但不往下鑽——避免把整棵子頁面樹一起抓下來。
 _NO_DESCEND = frozenset({"child_page", "child_database"})
 
+# 攤平 block 樹的每層縮排單位。
+_INDENT = "  "
+
+# 兩支工具（search／read）共用、字字相同的回覆——集中一處，改字或多語系時不會漏改也不會改到不一致。
+_MSG_AUTH_FAILED = "Notion 認證失敗（token 無效或已撤銷），請檢查 NOTION_API_KEY。"
+_MSG_UNREACHABLE = "Notion 服務暫時無法連線，請稍後再試。"
+_MSG_READ_FAILED = "Notion 讀取失敗，請稍後再試。"
+
+
+def _headers() -> dict[str, str]:
+    """組 Notion API 的請求標頭（Bearer token + 版本 + JSON）。兩支工具共用。"""
+    return {
+        "Authorization": f"Bearer {get_settings().notion_api_key}",
+        "Notion-Version": _NOTION_VERSION,
+        "Content-Type": "application/json",
+    }
+
 
 def _extract_title(result: dict) -> str:
     """從 search 結果取標題純文字。
@@ -87,15 +104,9 @@ async def search_notion(query: str) -> str:
     if not query or not query.strip():
         return "請提供要在 Notion 搜尋的關鍵字。"
 
-    settings = get_settings()
-    if not settings.notion_enabled:
+    if not get_settings().notion_enabled:
         return "尚未設定 Notion 整合（NOTION_API_KEY），無法查詢 Notion。"
 
-    headers = {
-        "Authorization": f"Bearer {settings.notion_api_key}",
-        "Notion-Version": _NOTION_VERSION,
-        "Content-Type": "application/json",
-    }
     payload = {
         "query": query,
         "page_size": _PAGE_SIZE,
@@ -104,15 +115,15 @@ async def search_notion(query: str) -> str:
     }
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-            response = await http.post(_SEARCH_URL, headers=headers, json=payload)
+            response = await http.post(_SEARCH_URL, headers=_headers(), json=payload)
     except Exception:
         logger.exception("Notion 搜尋請求例外 query=%s", query)
-        return "Notion 服務暫時無法連線，請稍後再試。"
+        return _MSG_UNREACHABLE
 
     if response.status_code == 401:
         # token 失效／被撤銷——設定問題，明講讓使用者去修，別誤導成「查無資料」。
         logger.warning("Notion 搜尋 401：token 無效或已撤銷")
-        return "Notion 認證失敗（token 無效或已撤銷），請檢查 NOTION_API_KEY。"
+        return _MSG_AUTH_FAILED
     if response.status_code // 100 != 2:
         logger.warning("Notion 搜尋 status=%s body=%s", response.status_code, response.text[:300])
         return "Notion 查詢失敗，請稍後再試。"
@@ -264,7 +275,7 @@ async def _render_blocks(
         text = _format_block(block, number)
         if text is not None:
             # code fence 可能多行，逐行縮排才對齊
-            indent = "  " * depth
+            indent = _INDENT * depth
             lines.extend(f"{indent}{line}" for line in text.split("\n"))
         should_descend = block.get("has_children") and block_type not in _NO_DESCEND and depth + 1 < _MAX_DEPTH
         if should_descend:
@@ -274,7 +285,7 @@ async def _render_blocks(
             else:
                 # 別靜默吞掉：子樹讀不到就明講一行，對齊「以真實資料為準、如實回報」的取向。
                 logger.warning("Notion 讀取子 block 失敗 status=%s block=%s", error, block.get("id"))
-                lines.append("  " * (depth + 1) + "（部分內容讀取失敗）")
+                lines.append(_INDENT * (depth + 1) + "（部分內容讀取失敗）")
     return lines
 
 
@@ -292,27 +303,22 @@ async def read_notion_page(page_ref: str) -> str:
     if not page_id:
         return "無法從輸入解析出 Notion 頁面 ID，請提供頁面的連結或 32 碼 ID。"
 
-    settings = get_settings()
-    if not settings.notion_enabled:
+    if not get_settings().notion_enabled:
         return "尚未設定 Notion 整合（NOTION_API_KEY），無法讀取 Notion 頁面。"
 
-    headers = {
-        "Authorization": f"Bearer {settings.notion_api_key}",
-        "Notion-Version": _NOTION_VERSION,
-        "Content-Type": "application/json",
-    }
+    headers = _headers()
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
             meta = await http.get(_PAGE_URL.format(page_id=page_id), headers=headers)
             if meta.status_code == 401:
                 logger.warning("Notion 讀頁 401：token 無效或已撤銷")
-                return "Notion 認證失敗（token 無效或已撤銷），請檢查 NOTION_API_KEY。"
+                return _MSG_AUTH_FAILED
             if meta.status_code == 404:
                 # 找不到／沒權限／傳的其實是資料庫——Notion 一律回 404，一併提示可能原因。
                 return "找不到該 Notion 頁面（可能是連結有誤、它是資料庫，或尚未分享給整合）。"
             if meta.status_code // 100 != 2:
                 logger.warning("Notion 讀頁 status=%s body=%s", meta.status_code, meta.text[:300])
-                return "Notion 讀取失敗，請稍後再試。"
+                return _MSG_READ_FAILED
 
             meta_body = meta.json()
             title = _extract_title(meta_body)
@@ -321,12 +327,12 @@ async def read_notion_page(page_ref: str) -> str:
             blocks, error = await _collect_children(http, headers, page_id)
             if error is not None:
                 logger.warning("Notion 讀取 block status=%s page=%s", error, page_id)
-                return "Notion 讀取失敗，請稍後再試。"
+                return _MSG_READ_FAILED
             budget = _RenderBudget()
             lines = await _render_blocks(http, headers, blocks, 0, budget)
     except Exception:
         logger.exception("Notion 讀頁請求例外 page=%s", page_ref)
-        return "Notion 服務暫時無法連線，請稍後再試。"
+        return _MSG_UNREACHABLE
 
     header = f"Notion 頁面「{title}」（最後編輯 {edited}）："
     if not lines:
