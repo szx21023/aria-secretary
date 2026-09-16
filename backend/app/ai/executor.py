@@ -9,7 +9,6 @@ event、add/complete task、create/toggle reminder）。寫入工具成功時在
 """
 
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -54,6 +53,21 @@ _TZ = ZoneInfo(get_settings().app_tz)
 # 找空檔的工作時間窗（在地時間）
 WORK_START = time(9, 0)
 WORK_END = time(18, 0)
+
+# 會改動資料的工具；用來判斷「呼叫了卻 changed=None」是真的 no-op（找不到/模糊/衝突/壞輸入）。
+_WRITE_TOOLS = frozenset(
+    {
+        TOOL_CREATE_EVENT,
+        TOOL_RESCHEDULE_EVENT,
+        TOOL_CANCEL_EVENT,
+        TOOL_ADD_TASK,
+        TOOL_COMPLETE_TASK,
+        TOOL_CREATE_REMINDER,
+        TOOL_TOGGLE_REMINDER,
+        TOOL_CREATE_MILESTONE,
+        TOOL_SET_MILESTONE,
+    }
+)
 
 # 里程碑只給日期時，預設排在當天這個時間、長度一小時（行事曆上才有個具體區塊）
 MILESTONE_DEFAULT_TIME = time(9, 0)
@@ -478,69 +492,6 @@ async def set_milestone(db: AsyncSession, query: str, is_milestone: bool) -> Too
     return ToolResult(f"「{event.title}」{action}。", changed="events")
 
 
-# tool name → 執行函式。分兩張表：
-# - 唯讀 handler 回字串，由 _dispatch 統一包成 ToolResult；
-# - 寫入 handler 自帶 ToolResult（含 changed）。
-# lambda 只做「從 args 取參數」的轉接，不 await——回傳 coroutine 交給 _dispatch await。
-# 名稱一律用 constants 的 TOOL_* 常數，與 tools.py 的定義綁在同一份，杜絕字面值漂移。
-_ReadHandler = Callable[[AsyncSession, dict], Awaitable[str]]
-_WriteHandler = Callable[[AsyncSession, dict], Awaitable[ToolResult]]
-
-_READ_HANDLERS: dict[str, _ReadHandler] = {
-    TOOL_GET_SCHEDULE: lambda db, args: get_schedule(db, args.get("date"), args.get("range", "day")),
-    TOOL_FIND_FREE_SLOTS: lambda db, args: find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30)),
-    TOOL_GET_TASKS: lambda db, args: get_tasks(db),
-    TOOL_GET_REMINDERS: lambda db, args: get_reminders(db),
-    TOOL_GET_WEATHER: lambda db, args: get_weather(args["location"], args.get("date")),
-    TOOL_SEARCH_NOTION: lambda db, args: search_notion(args["query"]),
-    TOOL_READ_NOTION_PAGE: lambda db, args: read_notion_page(args["page"]),
-    TOOL_GET_MILESTONES: lambda db, args: get_milestones(db),
-}
-
-_WRITE_HANDLERS: dict[str, _WriteHandler] = {
-    TOOL_CREATE_EVENT: lambda db, args: create_event(
-        db,
-        args["title"],
-        args["start_at"],
-        args["duration_min"],
-        args.get("category"),
-        args.get("location"),
-        args.get("attendees"),
-        args.get("allow_conflict", False),
-    ),
-    TOOL_RESCHEDULE_EVENT: lambda db, args: reschedule_event(
-        db,
-        args["event_id"],
-        args.get("new_start_at"),
-        args.get("delta_min"),
-        args.get("allow_conflict", False),
-    ),
-    TOOL_CANCEL_EVENT: lambda db, args: cancel_event(db, args["event_id"]),
-    TOOL_ADD_TASK: lambda db, args: add_task(db, args["title"], args.get("due_at"), args.get("priority")),
-    TOOL_COMPLETE_TASK: lambda db, args: complete_task(db, args["query"]),
-    TOOL_CREATE_REMINDER: lambda db, args: create_reminder(
-        db,
-        args["title"],
-        args.get("subtitle"),
-        args.get("trigger_at"),
-        args.get("kind"),
-        args.get("recurrence"),
-    ),
-    TOOL_TOGGLE_REMINDER: lambda db, args: toggle_reminder(db, args["query"], args["is_enabled"]),
-    TOOL_CREATE_MILESTONE: lambda db, args: create_milestone(
-        db,
-        args["title"],
-        args["target_date"],
-        args.get("start_time"),
-        args.get("note"),
-    ),
-    TOOL_SET_MILESTONE: lambda db, args: set_milestone(db, args["query"], args["is_milestone"]),
-}
-
-# 會改動資料的工具（= 寫入 handler 的 keys）；用來判斷「呼叫了卻 changed=None」是真的 no-op。
-_WRITE_TOOLS = frozenset(_WRITE_HANDLERS)
-
-
 async def run_tool(db: AsyncSession, name: str, args: dict) -> ToolResult:
     result = await _dispatch(db, name, args)
     # 寫入工具被呼叫卻沒改到資料（找不到/模糊/衝突/壞輸入），留一筆 log。
@@ -550,11 +501,68 @@ async def run_tool(db: AsyncSession, name: str, args: dict) -> ToolResult:
     return result
 
 
+# tool name → 執行函式
 async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
-    read_handler = _READ_HANDLERS.get(name)
-    if read_handler is not None:
-        return ToolResult(await read_handler(db, args))
-    write_handler = _WRITE_HANDLERS.get(name)
-    if write_handler is not None:
-        return await write_handler(db, args)
+    if name == TOOL_GET_SCHEDULE:
+        return ToolResult(await get_schedule(db, args.get("date"), args.get("range", "day")))
+    if name == TOOL_FIND_FREE_SLOTS:
+        return ToolResult(await find_free_slots_tool(db, args.get("date"), args.get("min_minutes", 30)))
+    if name == TOOL_GET_TASKS:
+        return ToolResult(await get_tasks(db))
+    if name == TOOL_GET_REMINDERS:
+        return ToolResult(await get_reminders(db))
+    if name == TOOL_GET_WEATHER:
+        return ToolResult(await get_weather(args["location"], args.get("date")))
+    if name == TOOL_SEARCH_NOTION:
+        return ToolResult(await search_notion(args["query"]))
+    if name == TOOL_READ_NOTION_PAGE:
+        return ToolResult(await read_notion_page(args["page"]))
+    if name == TOOL_CREATE_EVENT:
+        return await create_event(
+            db,
+            args["title"],
+            args["start_at"],
+            args["duration_min"],
+            args.get("category"),
+            args.get("location"),
+            args.get("attendees"),
+            args.get("allow_conflict", False),
+        )
+    if name == TOOL_RESCHEDULE_EVENT:
+        return await reschedule_event(
+            db,
+            args["event_id"],
+            args.get("new_start_at"),
+            args.get("delta_min"),
+            args.get("allow_conflict", False),
+        )
+    if name == TOOL_CANCEL_EVENT:
+        return await cancel_event(db, args["event_id"])
+    if name == TOOL_ADD_TASK:
+        return await add_task(db, args["title"], args.get("due_at"), args.get("priority"))
+    if name == TOOL_COMPLETE_TASK:
+        return await complete_task(db, args["query"])
+    if name == TOOL_CREATE_REMINDER:
+        return await create_reminder(
+            db,
+            args["title"],
+            args.get("subtitle"),
+            args.get("trigger_at"),
+            args.get("kind"),
+            args.get("recurrence"),
+        )
+    if name == TOOL_TOGGLE_REMINDER:
+        return await toggle_reminder(db, args["query"], args["is_enabled"])
+    if name == TOOL_GET_MILESTONES:
+        return ToolResult(await get_milestones(db))
+    if name == TOOL_CREATE_MILESTONE:
+        return await create_milestone(
+            db,
+            args["title"],
+            args["target_date"],
+            args.get("start_time"),
+            args.get("note"),
+        )
+    if name == TOOL_SET_MILESTONE:
+        return await set_milestone(db, args["query"], args["is_milestone"])
     return ToolResult(f"未知的工具：{name}")
