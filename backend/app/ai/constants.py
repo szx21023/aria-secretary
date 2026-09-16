@@ -1,23 +1,31 @@
-"""AI 工具的名稱常數。
+"""AI 工具的名稱列舉。
 
 tool 定義（tools.py）與分派（executor.py）共用同一份，避免兩處字面值各自漂移——
-名稱對不上會讓工具靜默掉進「未知的工具」而不報錯，用常數綁在一起就不可能只改到一邊。
+名稱對不上會讓工具靜默掉進「未知的工具」而不報錯，綁在同一個列舉就不可能只改到一邊。
+
+沿用專案慣例的 `class X(str, Enum)`（見 CLAUDE.md）：成員即字串，`==`、集合成員判斷、
+JSON 序列化都以字串值運作，與純字串常數行為等價，另外還能 iterate／驗證名稱。
 """
 
-TOOL_GET_SCHEDULE = "get_schedule"
-TOOL_FIND_FREE_SLOTS = "find_free_slots"
-TOOL_GET_TASKS = "get_tasks"
-TOOL_GET_REMINDERS = "get_reminders"
-TOOL_GET_WEATHER = "get_weather"
-TOOL_SEARCH_NOTION = "search_notion"
-TOOL_READ_NOTION_PAGE = "read_notion_page"
-TOOL_CREATE_EVENT = "create_event"
-TOOL_RESCHEDULE_EVENT = "reschedule_event"
-TOOL_CANCEL_EVENT = "cancel_event"
-TOOL_ADD_TASK = "add_task"
-TOOL_COMPLETE_TASK = "complete_task"
-TOOL_CREATE_REMINDER = "create_reminder"
-TOOL_TOGGLE_REMINDER = "toggle_reminder"
-TOOL_GET_MILESTONES = "get_milestones"
-TOOL_CREATE_MILESTONE = "create_milestone"
-TOOL_SET_MILESTONE = "set_milestone"
+from enum import Enum, unique
+
+
+@unique
+class ToolName(str, Enum):
+    GET_SCHEDULE = "get_schedule"
+    FIND_FREE_SLOTS = "find_free_slots"
+    GET_TASKS = "get_tasks"
+    GET_REMINDERS = "get_reminders"
+    GET_WEATHER = "get_weather"
+    SEARCH_NOTION = "search_notion"
+    READ_NOTION_PAGE = "read_notion_page"
+    CREATE_EVENT = "create_event"
+    RESCHEDULE_EVENT = "reschedule_event"
+    CANCEL_EVENT = "cancel_event"
+    ADD_TASK = "add_task"
+    COMPLETE_TASK = "complete_task"
+    CREATE_REMINDER = "create_reminder"
+    TOGGLE_REMINDER = "toggle_reminder"
+    GET_MILESTONES = "get_milestones"
+    CREATE_MILESTONE = "create_milestone"
+    SET_MILESTONE = "set_milestone"
