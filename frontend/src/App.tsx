@@ -99,7 +99,9 @@ export default function App() {
             {view === "reminders" && (
               <RemindersView
                 reminders={reminderList}
-                onToggleReminder={(r) => toggleReminder.mutate({ id: r.id, is_enabled: r.is_enabled })}
+                onToggleReminder={(r) =>
+                  toggleReminder.mutate({ id: r.id, is_enabled: r.is_enabled })
+                }
               />
             )}
             {view === "life" && (
