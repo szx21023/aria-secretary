@@ -364,6 +364,25 @@ async def test_read_paginates_children(monkeypatch):
     assert "第二頁內容" in out  # 分頁有被續抓
 
 
+async def test_read_stops_fetching_once_block_cap_reached(monkeypatch):
+    # 第一頁就已達上限：不該再去抓第二頁（避免對超大節點白打 API）
+    full = _FakeResp(
+        {
+            "results": [_blk("paragraph", f"x{i}") for i in range(notion._MAX_BLOCKS)],
+            "has_more": True,
+            "next_cursor": "cur",
+        }
+    )
+    sentinel = _FakeResp({"results": [_blk("paragraph", "不該被抓到")]})
+    pages = [full, sentinel]  # 假 client 會依序 pop；只 pop 到 full 就代表停在第一頁
+    http = _ReadHTTP(meta=_meta_page(), children={_DASHED_ID: pages})
+    _patch_read(monkeypatch, http)
+    out = await notion.read_notion_page(_DASHED_ID)
+    assert len(pages) == 1  # sentinel 未被 pop → 第二頁沒被抓
+    assert "不該被抓到" not in out
+    assert "僅顯示前" in out  # 達上限有標示截斷
+
+
 async def test_read_nested_fetch_error_marks_partial(monkeypatch):
     # 子 block 抓取失敗不可靜默吞掉：要留一行「部分內容讀取失敗」
     toggle = _blk("toggle", "展開我")

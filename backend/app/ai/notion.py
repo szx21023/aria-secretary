@@ -239,9 +239,13 @@ class _RenderBudget:
 
 
 async def _collect_children(
-    http: httpx.AsyncClient, headers: dict[str, str], block_id: str
+    http: httpx.AsyncClient, headers: dict[str, str], block_id: str, budget: _RenderBudget
 ) -> tuple[list[dict], int | None]:
-    """抓某 block 的所有直接子 block（處理分頁）。回 (blocks, error_status)；成功時 error_status 為 None。"""
+    """抓某 block 的所有直接子 block（處理分頁）。回 (blocks, error_status)；成功時 error_status 為 None。
+
+    達 _MAX_BLOCKS 就停止分頁（避免對超大節點白打 API），並在 budget 標記截斷——
+    渲染剛好收滿 _MAX_BLOCKS 時不會觸發渲染端的截斷旗標，這裡補上才不會靜默丟掉後續內容。
+    """
     blocks: list[dict] = []
     cursor: str | None = None
     while True:
@@ -253,6 +257,9 @@ async def _collect_children(
             return blocks, response.status_code
         body = response.json()
         blocks.extend(body.get("results") or [])
+        if len(blocks) >= _MAX_BLOCKS:
+            budget.truncated = True
+            return blocks, None
         cursor = body.get("next_cursor")
         if not (body.get("has_more") and cursor):
             return blocks, None
@@ -282,7 +289,7 @@ async def _render_blocks(
             lines.extend(f"{indent}{line}" for line in text.split("\n"))
         should_descend = block.get("has_children") and block_type not in _NO_DESCEND and depth + 1 < _MAX_DEPTH
         if should_descend:
-            children, error = await _collect_children(http, headers, block["id"])
+            children, error = await _collect_children(http, headers, block["id"], budget)
             if error is None:
                 lines.extend(await _render_blocks(http, headers, children, depth + 1, budget))
             else:
@@ -327,11 +334,11 @@ async def read_notion_page(page_ref: str) -> str:
             title = _extract_title(meta_body)
             edited = _format_edited(meta_body.get("last_edited_time"))
 
-            blocks, error = await _collect_children(http, headers, page_id)
+            budget = _RenderBudget()
+            blocks, error = await _collect_children(http, headers, page_id, budget)
             if error is not None:
                 logger.warning("Notion 讀取 block status=%s page=%s", error, page_id)
                 return _MSG_READ_FAILED
-            budget = _RenderBudget()
             lines = await _render_blocks(http, headers, blocks, 0, budget)
     except Exception:
         logger.exception("Notion 讀頁請求例外 page=%s", page_ref)
