@@ -198,7 +198,11 @@ class _ReadHTTP:
         if "/pages/" in url:
             return self._meta
         block_id = url.split("/blocks/")[1].split("/children")[0]
-        return self._children.get(block_id, _FakeResp({"results": []}))
+        entry = self._children.get(block_id)
+        # list = 依序回多頁（測分頁）；單一 _FakeResp = 每次都回同一份。
+        if isinstance(entry, list):
+            return entry.pop(0) if entry else _FakeResp({"results": []})
+        return entry if entry is not None else _FakeResp({"results": []})
 
 
 def _patch_read(monkeypatch, http, *, enabled: bool = True) -> None:
@@ -327,6 +331,50 @@ async def test_read_truncates_oversized_page(monkeypatch):
     _patch_read(monkeypatch, http)
     out = await notion.read_notion_page(_DASHED_ID)
     assert "僅顯示前" in out
+
+
+async def test_read_renders_table_rows(monkeypatch):
+    table = _blk("table", "")
+    table["has_children"] = True
+    table["id"] = "tbl-1"
+    top = _FakeResp({"results": [table]})
+    rows = _FakeResp(
+        {
+            "results": [
+                {"type": "table_row", "table_row": {"cells": [[{"plain_text": "指標"}], [{"plain_text": "值"}]]}},
+                {"type": "table_row", "table_row": {"cells": [[{"plain_text": "SLA"}], [{"plain_text": "99.9%"}]]}},
+            ]
+        }
+    )
+    http = _ReadHTTP(meta=_meta_page(), children={_DASHED_ID: top, "tbl-1": rows})
+    _patch_read(monkeypatch, http)
+    out = await notion.read_notion_page(_DASHED_ID)
+    assert "| 指標 | 值 |" in out
+    assert "| SLA | 99.9% |" in out
+
+
+async def test_read_paginates_children(monkeypatch):
+    # 子 block 分兩頁：第一頁 has_more + next_cursor，第二頁補完
+    page1 = _FakeResp({"results": [_blk("paragraph", "第一頁內容")], "has_more": True, "next_cursor": "cur"})
+    page2 = _FakeResp({"results": [_blk("paragraph", "第二頁內容")]})
+    http = _ReadHTTP(meta=_meta_page(), children={_DASHED_ID: [page1, page2]})
+    _patch_read(monkeypatch, http)
+    out = await notion.read_notion_page(_DASHED_ID)
+    assert "第一頁內容" in out
+    assert "第二頁內容" in out  # 分頁有被續抓
+
+
+async def test_read_nested_fetch_error_marks_partial(monkeypatch):
+    # 子 block 抓取失敗不可靜默吞掉：要留一行「部分內容讀取失敗」
+    toggle = _blk("toggle", "展開我")
+    toggle["has_children"] = True
+    toggle["id"] = "child-err"
+    top = _FakeResp({"results": [toggle]})
+    http = _ReadHTTP(meta=_meta_page(), children={_DASHED_ID: top, "child-err": _FakeResp({}, status_code=500)})
+    _patch_read(monkeypatch, http)
+    out = await notion.read_notion_page(_DASHED_ID)
+    assert "▸ 展開我" in out
+    assert "部分內容讀取失敗" in out
 
 
 async def test_run_tool_routes_read_notion_page_readonly(db, monkeypatch):

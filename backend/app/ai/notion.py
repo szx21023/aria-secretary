@@ -172,7 +172,7 @@ def _format_block(block: dict, number: int) -> str | None:
     """把單一 block 轉成一行純文字（不含子 block）；空段落與不支援的型別回 None 表略過。
 
     number 只給 numbered_list_item 用：同層第幾個編號項（由呼叫端維護，跨層會重置）。
-    圖片／檔案／表格等非文字型別略過——目的是給模型「讀得懂的內文」，不是完整還原版面。
+    圖片／檔案等非文字型別略過（表格會把每列轉成 | 分隔）——目的是給模型「讀得懂的內文」，不是完整還原版面。
     """
     block_type = block.get("type")
     data = block.get(block_type) or {}
@@ -202,6 +202,10 @@ def _format_block(block: dict, number: int) -> str | None:
         return f"```{data.get('language') or ''}\n{text}\n```"
     if block_type == "divider":
         return "———"
+    if block_type == "table_row":
+        # cells 是 list[list[rich_text]]；串成 | A | B | 一列。表格常放 SLA／規格／對照等關鍵資訊，不能丟。
+        cells = data.get("cells") or []
+        return "| " + " | ".join(_rich_text(cell) for cell in cells) + " |"
     if block_type == "child_page":
         return f"[子頁面] {data.get('title', '')}"
     if block_type == "child_database":
@@ -267,6 +271,10 @@ async def _render_blocks(
             children, error = await _collect_children(http, headers, block["id"])
             if error is None:
                 lines.extend(await _render_blocks(http, headers, children, depth + 1, budget))
+            else:
+                # 別靜默吞掉：子樹讀不到就明講一行，對齊「以真實資料為準、如實回報」的取向。
+                logger.warning("Notion 讀取子 block 失敗 status=%s block=%s", error, block.get("id"))
+                lines.append("  " * (depth + 1) + "（部分內容讀取失敗）")
     return lines
 
 
