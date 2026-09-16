@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.notion import search_notion
+from app.ai.notion import read_notion_page, search_notion
 from app.ai.weather import get_weather
 from app.config import get_settings
 from app.models.enums import EventCategory, ReminderKind, TaskPriority
@@ -496,6 +496,8 @@ async def _dispatch(db: AsyncSession, name: str, args: dict) -> ToolResult:
         return ToolResult(await get_weather(args["location"], args.get("date")))
     if name == "search_notion":
         return ToolResult(await search_notion(args["query"]))
+    if name == "read_notion_page":
+        return ToolResult(await read_notion_page(args["page"]))
     if name == "create_event":
         return await create_event(
             db,

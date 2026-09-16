@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     auth_token_days: int = 7  # 簽發 token 的有效天數
 
     # ── Notion 整合（選用）──────────────────────────────────────
-    # Internal Integration token（ntn_…）。空＝未設定：search_notion 工具會回一句
-    # 「尚未設定」而非炸錯，其餘功能照常。整合需在 Notion 端把要查的頁面分享給它。
+    # Internal Integration token（ntn_…）。空＝未設定：Notion 工具（search_notion／
+    # read_notion_page）會回一句「尚未設定」而非炸錯，其餘功能照常。整合需在 Notion 端把要查的頁面分享給它。
     notion_api_key: str = ""
 
     # ── LINE 串接 ──────────────────────────────────────────────
