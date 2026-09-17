@@ -34,7 +34,7 @@ async def load_history(db: AsyncSession, convo_id: str) -> list[dict]:
         for message in rows
         if message.role in (MessageRole.user, MessageRole.assistant) and message.content
     ]
-    while history and history[0]["role"] == "assistant":
+    while history and history[0]["role"] == MessageRole.assistant.value:
         history.pop(0)
     return history
 
