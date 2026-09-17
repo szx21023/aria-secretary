@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.agent import stream_chat
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
+from app.models.enums import MessageRole
 from app.seed import seed_if_empty
 
 logger = logging.getLogger(__name__)
@@ -108,9 +109,10 @@ async def _repl() -> None:
                 except Exception:
                     logger.exception("錯誤後 rollback 也失敗")
                 continue
-            # 只把純文字回灌臨時記憶，對齊網頁／LINE 的持久化格式（不留 thinking／tool_use 區塊）
-            history.append({"role": "user", "content": user_text})
-            history.append({"role": "assistant", "content": reply})
+            # 只把純文字回灌臨時記憶，對齊網頁／LINE 的持久化格式（不留 thinking／tool_use 區塊）；
+            # role 用 MessageRole.value，與 services.load_history 產出的 dict 逐字一致
+            history.append({"role": MessageRole.user.value, "content": user_text})
+            history.append({"role": MessageRole.assistant.value, "content": reply})
             print()
 
     print("bye 👋")
