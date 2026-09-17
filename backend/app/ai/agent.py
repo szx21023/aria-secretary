@@ -15,7 +15,7 @@ from app.ai.executor import run_tool
 from app.ai.system_prompt import SYSTEM_PROMPT
 from app.ai.tools import TOOLS
 from app.config import get_settings
-from app.schemas.chat import ChatEvent
+from app.schemas.chat import ChatEvent, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
             async for event in stream:
                 if event.type == "content_block_delta" and event.delta.type == "text_delta":
                     full_text += event.delta.text
-                    yield {"type": "delta", "text": event.delta.text}
+                    yield {"type": EventType.delta, "text": event.delta.text}
             final = await stream.get_final_message()
 
         if final.stop_reason != "tool_use":
@@ -69,7 +69,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
             if block.type == "tool_use":
                 # 成功路徑也留痕：日後 debug「為何回了奇怪的答案」才知道工具有沒有被呼叫、帶了什麼參數
                 logger.info("tool call: %s args=%s", block.name, block.input or {})
-                yield {"type": "tool", "name": block.name}
+                yield {"type": EventType.tool, "name": block.name}
                 # 工具執行失敗（DB 錯誤、未預期例外）回成 is_error 的 tool_result，
                 # 讓模型知道失敗並自我修正，而不是讓整輪對話死在 broad except。
                 try:
@@ -77,7 +77,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
                     tr = {"type": "tool_result", "tool_use_id": block.id, "content": result.text}
                     # 工具真的改了資料才推 state_changed，讓前端只重抓受影響的 query
                     if result.changed:
-                        yield {"type": "state_changed", "resource": result.changed}
+                        yield {"type": EventType.state_changed, "resource": result.changed}
                 except Exception as e:
                     # 工具若 commit 到一半失敗，整段串流共用的 session 會進 pending-rollback；
                     # 先 rollback 讓它對同輪後續工具與最後存 assistant 訊息仍可用，
@@ -104,7 +104,7 @@ async def stream_chat(db: AsyncSession, history: list[dict], user_text: str) -> 
     if has_hit_cap and not text:
         # 連一個字都沒生出來 → 別吐空泡泡，給可重試的提示
         text = "這次的查詢有點複雜，我沒能整理出完整回覆，可以換個方式再問一次嗎？"
-    yield {"type": "done", "text": text}
+    yield {"type": EventType.done, "text": text}
 
 
 async def run_chat(db: AsyncSession, history: list[dict], user_text: str) -> str:
@@ -115,9 +115,9 @@ async def run_chat(db: AsyncSession, history: list[dict], user_text: str) -> str
     """
     final_text = ""
     async for event in stream_chat(db, history, user_text):
-        if event["type"] == "done":
+        if event["type"] == EventType.done:
             final_text = event["text"]
-        elif event["type"] == "error":
+        elif event["type"] == EventType.error:
             # stream_chat 自身不發 error（它的工具失敗是 is_error tool_result，會續跑）；
             # 這條是防呆——真有 error frame 就讓呼叫端知道，而非把空字串當成功回覆。
             raise RuntimeError(event["message"])

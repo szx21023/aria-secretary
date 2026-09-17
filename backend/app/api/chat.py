@@ -10,7 +10,7 @@ from app.ai.agent import stream_chat
 from app.db import AsyncSessionLocal, get_db
 from app.models.chat import Message
 from app.models.enums import MessageRole
-from app.schemas.chat import ChatEvent, ChatRequestSchema, MessageReadSchema
+from app.schemas.chat import ChatEvent, ChatRequestSchema, EventType, MessageReadSchema
 from app.services.conversation import (
     add_assistant_message,
     add_user_message,
@@ -43,9 +43,9 @@ async def chat(payload: ChatRequestSchema) -> StreamingResponse:
             is_saved = False
             try:
                 async for event in stream_chat(db, history, payload.message):
-                    if event["type"] == "delta":
+                    if event["type"] == EventType.delta:
                         streamed += event["text"]
-                    elif event["type"] == "done":
+                    elif event["type"] == EventType.done:
                         content = event["text"] or streamed.strip()
                         if content:  # 不存空泡泡
                             add_assistant_message(db, convo.id, content)
@@ -63,7 +63,7 @@ async def chat(payload: ChatRequestSchema) -> StreamingResponse:
                 except Exception:
                     logger.exception("error 復原存檔也失敗 (convo=%s)", convo.id)
                     await db.rollback()  # 對齊 get_db 慣例：別讓 session 帶著未結束交易離開
-                yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
+                yield _sse({"type": EventType.error, "message": f"{type(e).__name__}: {e}"})
 
     return StreamingResponse(
         gen(),
