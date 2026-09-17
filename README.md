@@ -53,6 +53,22 @@ npm run dev
 ```
 開 http://localhost:5173 。Vite 已把 `/api` proxy 到後端，免設 CORS。
 
+### 命令列直接跟秘書對話（CLI，debug 用）
+
+不用起 server、不用登入，直接在終端機驅動 agent——與網頁／LINE **共用同一顆 agent loop**（`app/ai/agent.py`）、同一組工具。適合測試 agent 與觀察工具呼叫。
+
+```bash
+cd backend
+.venv/bin/python -m app.ai.cli
+```
+- 逐字串流回覆，並即時標示 `🔧 呼叫工具：<name>` 與 `✎ 已變更：<resource>`。
+- 指令：`/reset` 清空本次對話、`/exit`（或 Ctrl-D）離開。
+- 記憶為**獨立臨時**：只活在本行程、結束即丟，**不寫入對話歷史資料表**（與網頁／LINE 的持久化記憶分開）。
+- 工具對 events/tasks/reminders 的實際增刪改**仍會寫進 `DATABASE_URL` 指向的資料庫**。要完全隔離、不動到 dev 資料，指一個拋棄式 DB 即可：
+  ```bash
+  DATABASE_URL="sqlite+aiosqlite:///./scratch.db" .venv/bin/python -m app.ai.cli
+  ```
+
 ## LINE 串接
 
 在 LINE 上跟秘書對話、提醒/行程到點推播到 LINE。**選用**——不填金鑰就完全不啟用，本機/網頁照常跑。
