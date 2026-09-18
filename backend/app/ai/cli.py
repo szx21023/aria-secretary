@@ -23,6 +23,7 @@ from app.ai.agent import stream_chat
 from app.config import get_settings
 from app.db import AsyncSessionLocal, init_db
 from app.models.enums import MessageRole
+from app.schemas.chat import EventType
 from app.seed import seed_if_empty
 
 logger = logging.getLogger(__name__)
@@ -39,22 +40,22 @@ async def _one_turn(db: AsyncSession, history: list[dict], user_text: str) -> st
     sys.stdout.flush()
     async for event in stream_chat(db, history, user_text):
         kind = event["type"]
-        if kind == "delta":
+        if kind == EventType.delta:
             sys.stdout.write(event["text"])
             sys.stdout.flush()
             streamed_any = True
             at_line_start = event["text"].endswith("\n")
-        elif kind == "tool":
+        elif kind == EventType.tool:
             if not at_line_start:
                 print()
             print(f"  🔧 呼叫工具：{event['name']}")
             at_line_start = True
-        elif kind == "state_changed":
+        elif kind == EventType.state_changed:
             if not at_line_start:
                 print()
             print(f"  ✎ 已變更：{event['resource']}")
             at_line_start = True
-        elif kind == "done":
+        elif kind == EventType.done:
             final_text = event["text"]
 
     # 用盡輪數時的 fallback 文字不經 delta 事件；整輪若一個字都沒串過就補印一次，別讓畫面空白
