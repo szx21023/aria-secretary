@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    "sqlalchemy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",  # [asyncio] 帶入 async engine 必要的 greenlet
     "alembic>=1.13",
     "aiosqlite>=0.20",
     # Postgres（Cloud SQL）：asyncpg 給 app 的 async engine、psycopg2-binary 給 Alembic 同步 migration
