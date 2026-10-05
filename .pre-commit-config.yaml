@@ -46,9 +46,9 @@ repos:
   # ---- 後端 ----
   # Ruff:lint(含 import 排序、自動修正)+ format
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.16.10
     hooks:
-      - id: ruff
+      - id: ruff-check
         name: ruff (lint)
         args: [--fix]
         files: ^backend/
