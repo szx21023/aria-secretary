@@ -1050,6 +1050,16 @@ body {
 .s-inputbar input::placeholder {
   color: oklch(0.6 0.03 285);
 }
+.s-count {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: oklch(0.64 0.03 285);
+}
+.s-count.over {
+  color: oklch(0.72 0.17 25);
+  font-weight: 600;
+}
 .s-mic {
   color: oklch(0.64 0.03 285);
   cursor: pointer;
@@ -1070,6 +1080,11 @@ body {
   place-items: center;
   cursor: pointer;
   box-shadow: 0 6px 16px oklch(0.55 0.16 var(--acc1) / 0.55);
+}
+.s-send.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 .s-send svg {
   width: 16px;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { authHeaders, onUnauthorized } from "../lib/auth";
+import { MESSAGE_MAX_LENGTH, tooLongReply } from "../lib/chat";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -73,7 +74,8 @@ export function useChat() {
   const send = useCallback(
     async (raw: string) => {
       const text = raw.trim();
-      if (!text || thinking) return;
+      // 超長直接不送（連泡泡都不加）：輸入框已提示，其他呼叫端（如 EventDetail）也一併擋住
+      if (!text || thinking || text.length > MESSAGE_MAX_LENGTH) return;
       setMessages((m) => [...m, { who: "u", text }]);
       setThinking(true);
 
@@ -86,6 +88,14 @@ export function useChat() {
         if (res.status === 401) {
           onUnauthorized(); // token 失效 → 登出切回登入頁
           return;
+        }
+        if (res.status === 422) {
+          // 訊息太長是使用者能自己修正的錯，要講清楚原因；不能落到下面的「連線問題」
+          const reply = tooLongReply(await res.json().catch(() => null));
+          if (reply) {
+            fail(reply);
+            return;
+          }
         }
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
