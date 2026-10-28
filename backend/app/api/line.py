@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.db import AsyncSessionLocal
 from app.line import client
 from app.line.signature import verify_signature
+from app.schemas.chat import MESSAGE_MAX_LENGTH
 from app.services.conversation import (
     add_assistant_message,
     add_user_message,
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api/line", tags=["line"])
 
 _FALLBACK_REPLY = "抱歉，我這邊出了點狀況，沒能處理你的訊息，等一下再試一次好嗎？"
 _UNAUTHORIZED_REPLY = "抱歉，這個秘書只服務它的主人，沒辦法回應你的訊息。"
+_TOO_LONG_REPLY = f"訊息太長了（上限 {MESSAGE_MAX_LENGTH} 字），可以分段傳給我嗎？"
 
 
 def _authorized(settings, user_id: str | None) -> bool:
@@ -71,6 +73,12 @@ async def webhook(
             if reply_token:
                 background.add_task(_decline, settings.line_channel_access_token, reply_token)
             continue
+        # 與網頁同一個上限（ChatRequestSchema）：LINE 本身容許到 5000 字，不擋的話這裡就是繞過上限的後門。
+        if len(text) > MESSAGE_MAX_LENGTH:
+            logger.info("LINE 訊息過長（%d 字），已婉拒", len(text))
+            if reply_token:
+                background.add_task(_reject_too_long, settings.line_channel_access_token, reply_token)
+            continue
         # 背景處理：AI 可能跑數秒，不能卡住 webhook 回應（否則 LINE 逾時重送 → 重複回覆）。
         background.add_task(_handle_text, text, reply_token, user_id)
 
@@ -79,6 +87,10 @@ async def webhook(
 
 async def _decline(token: str, reply_token: str) -> None:
     await client.reply(token, reply_token, _UNAUTHORIZED_REPLY)
+
+
+async def _reject_too_long(token: str, reply_token: str) -> None:
+    await client.reply(token, reply_token, _TOO_LONG_REPLY)
 
 
 async def _handle_text(text: str, reply_token: str | None, user_id: str | None) -> None:

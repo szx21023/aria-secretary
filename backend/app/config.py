@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # 啟動時 events 表為空是否灌入 demo 種子資料。dev 預設開（方便本機有資料可看）；
     # 接持久 DB（Cloud SQL）的正式環境設 false，避免清空行程後冷啟動又把 demo 種回來。
     seed_on_empty: bool = True
+    # 每輪送給模型的對話歷史上限（則數，user 與 assistant 各算一則）。全域單一對話會無限累積，
+    # 不設上限的話每輪 input token 隨使用線性成長，最後撞 context 上限直接 400。
+    # 搭配單則輸入上限（schemas.chat.MESSAGE_MAX_LENGTH）與 MAX_OUTPUT_TOKENS，最壞情況的 token 量可估。
+    history_max_messages: int = 40
 
     # ── 網頁登入驗證 ──────────────────────────────────────────
     # 單人自用：一個登入密碼 + 一把 JWT 簽章密鑰，皆從環境變數注入。
