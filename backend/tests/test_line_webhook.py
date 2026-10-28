@@ -103,6 +103,41 @@ async def test_webhook_blocks_unauthorized_user(client, monkeypatch):
     assert declined == ["rTok"]
 
 
+async def test_webhook_rejects_too_long_message(client, monkeypatch):
+    # 超過網頁同款上限 → 不進對話（不存、不跑 AI），改回覆請對方分段
+    monkeypatch.setattr(line, "get_settings", lambda: _fake_settings())
+    handled, rejected = [], []
+    monkeypatch.setattr(line, "_handle_text", lambda *a: handled.append(a))
+
+    async def fake_reject(token, reply_token):
+        rejected.append(reply_token)
+
+    monkeypatch.setattr(line, "_reject_too_long", fake_reject)
+
+    body = _text_event("字" * (line.MESSAGE_MAX_LENGTH + 1), reply_token="rTok")
+    resp = await client.post("/api/line/webhook", content=body, headers={"X-Line-Signature": _sign(body)})
+
+    assert resp.status_code == 200
+    assert handled == []
+    assert rejected == ["rTok"]
+
+
+async def test_webhook_accepts_message_at_length_limit(client, monkeypatch):
+    monkeypatch.setattr(line, "get_settings", lambda: _fake_settings())
+    handled = []
+
+    async def fake_handle(text, reply_token, user_id):
+        handled.append(len(text))
+
+    monkeypatch.setattr(line, "_handle_text", fake_handle)
+
+    body = _text_event("字" * line.MESSAGE_MAX_LENGTH)
+    resp = await client.post("/api/line/webhook", content=body, headers={"X-Line-Signature": _sign(body)})
+
+    assert resp.status_code == 200
+    assert handled == [line.MESSAGE_MAX_LENGTH]
+
+
 async def test_webhook_rejects_missing_signature_header(client, monkeypatch):
     # 完全沒帶 X-Line-Signature（與「帶了但錯」是不同分支：Header 預設 None）→ 仍須 403。
     monkeypatch.setattr(line, "get_settings", lambda: _fake_settings())
